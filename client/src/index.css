@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 37 99 235;
+    --color-surface: 255 255 255;
+    --color-bg: 248 250 252;
+    --color-text: 15 23 42;
+    --color-muted: 100 116 139;
+    --color-border: 226 232 240;
+  }
+
+  .dark {
+    --color-surface: 30 41 59;
+    --color-bg: 15 23 42;
+    --color-text: 241 245 249;
+    --color-muted: 148 163 184;
+    --color-border: 51 65 85;
+  }
+
+  * {
+    @apply border-slate-200 dark:border-slate-700;
+  }
+
+  body {
+    @apply bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500 shadow-sm hover:shadow-md;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 focus:ring-slate-400 shadow-sm;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 focus:ring-slate-400;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 hover:bg-red-700 text-white focus:ring-red-500;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm;
+  }
+
+  .textarea {
+    @apply input resize-none;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1;
+  }
+
+  .card {
+    @apply bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 cursor-pointer;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300;
+  }
+
+  .badge-green {
+    @apply badge bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300;
+  }
+
+  .badge-amber {
+    @apply badge bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300;
+  }
+
+  .badge-red {
+    @apply badge bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold text-slate-900 dark:text-slate-100;
+  }
+
+  .text-muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  .divider {
+    @apply border-t border-slate-200 dark:border-slate-700;
+  }
+
+  /* Resume preview paper */
+  .resume-paper {
+    @apply bg-white shadow-xl;
+    width: 794px;
+    min-height: 1123px;
+    font-family: 'Times New Roman', Times, serif;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(148 163 184);
+    border-radius: 3px;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-slate-200 dark:bg-slate-700 rounded;
+  }
+
+  /* Toast animation */
+  .toast-enter {
+    animation: toastEnter 0.3s ease-out;
+  }
+
+  @keyframes toastEnter {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent;
+  }
+
+  /* Hero gradient */
+  .hero-gradient {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 40%, #7c3aed 100%);
+  }
+
+  /* Form section */
+  .form-section {
+    @apply card p-6 space-y-4;
+  }
+
+  /* Step indicator */
+  .step-circle {
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-glass {
+    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-md;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .resume-paper {
+    box-shadow: none !important;
+    width: 100% !important;
+  }
+}

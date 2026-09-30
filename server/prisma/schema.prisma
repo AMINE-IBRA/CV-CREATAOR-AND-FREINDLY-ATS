@@ -1,0 +1,310 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String
+  avatarUrl     String?
+  preferences   String    @default("{\"theme\":\"system\",\"language\":\"en\",\"defaultTemplateId\":\"classic-professional\"}")
+  plan          String    @default("free")
+  aiUsageCount  Int       @default(0)
+  aiUsageReset  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  resumes       Resume[]
+  coverLetters  CoverLetter[]
+  sessions      Session[]
+  aiUsageRecords AiUsageRecord[]
+  passwordResets PasswordReset[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Resume {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String   @default("Untitled Resume")
+  templateId      String   @default("classic-professional")
+  targetRole      String?
+  targetCompany   String?
+  isPublic        Boolean  @default(false)
+  
+  // Personal Info
+  fullName        String?
+  professionalTitle String?
+  email           String?
+  phone           String?
+  city            String?
+  country         String?
+  linkedinUrl     String?
+  githubUrl       String?
+  portfolioUrl    String?
+  photoUrl        String?
+  
+  // Summary
+  summary         String?
+  
+  // Template customization
+  fontFamily      String   @default("Inter")
+  fontSize        String   @default("medium")
+  accentColor     String   @default("#2563EB")
+  pageMargin      String   @default("normal")
+  lineSpacing     String   @default("normal")
+  paperSize       String   @default("a4")
+  
+  // Section order (JSON array)
+  sectionOrder    String   @default("[\"summary\",\"experience\",\"education\",\"skills\",\"projects\",\"certifications\"]")
+  
+  // Enabled/disabled sections (JSON)
+  enabledSections String   @default("{\"summary\":true,\"experience\":true,\"education\":true,\"skills\":true,\"projects\":true,\"certifications\":true,\"languages\":true,\"awards\":false,\"publications\":false,\"volunteer\":false,\"interests\":false,\"references\":false}")
+
+  completionScore Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experiences     WorkExperience[]
+  educations      Education[]
+  skills          Skill[]
+  projects        Project[]
+  certifications  Certification[]
+  languages       Language[]
+  awards          Award[]
+  publications    Publication[]
+  volunteer       Volunteer[]
+  interests       Interest[]
+  references      Reference[]
+  versions        ResumeVersion[]
+  aiUsageRecords  AiUsageRecord[]
+  coverLetters    CoverLetter[]
+  @@index([userId, updatedAt])
+}
+
+model Publication {
+  id          String @id @default(cuid())
+  resumeId    String
+  title       String
+  publisher   String?
+  date        String?
+  url         String?
+  description String?
+  sortOrder   Int @default(0)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  @@index([resumeId])
+}
+
+model Volunteer {
+  id           String @id @default(cuid())
+  resumeId     String
+  organization String
+  role         String?
+  startDate    String?
+  endDate      String?
+  isCurrent    Boolean @default(false)
+  description  String?
+  sortOrder    Int @default(0)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  @@index([resumeId])
+}
+
+model Interest {
+  id       String @id @default(cuid())
+  resumeId String
+  name     String
+  sortOrder Int @default(0)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  @@index([resumeId])
+}
+
+model Reference {
+  id       String @id @default(cuid())
+  resumeId String
+  name     String
+  position String?
+  company  String?
+  email    String?
+  phone    String?
+  sortOrder Int @default(0)
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  @@index([resumeId])
+}
+
+model ResumeVersion {
+  id        String @id @default(cuid())
+  resumeId  String
+  snapshot  String
+  label     String
+  createdAt DateTime @default(now())
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  @@index([resumeId, createdAt])
+}
+
+model AiUsageRecord {
+  id        String @id @default(cuid())
+  userId    String
+  feature   String
+  period    DateTime
+  status    String @default("reserved")
+  result    String?
+  resumeId  String?
+  title     String?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  @@index([userId, period])
+}
+
+model PasswordReset {
+  id        String @id @default(cuid())
+  userId    String
+  tokenHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model WorkExperience {
+  id             String   @id @default(cuid())
+  resumeId       String
+  jobTitle       String
+  company        String
+  location       String?
+  employmentType String?
+  startDate      String?
+  endDate        String?
+  isCurrent      Boolean  @default(false)
+  description    String?
+  achievements   String?
+  technologies   String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Education {
+  id          String   @id @default(cuid())
+  resumeId    String
+  institution String
+  degree      String?
+  fieldOfStudy String?
+  startDate   String?
+  endDate     String?
+  grade       String?
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Skill {
+  id        String   @id @default(cuid())
+  resumeId  String
+  name      String
+  category  String   @default("technical")
+  level     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  resumeId     String
+  name         String
+  description  String?
+  technologies String?
+  projectUrl   String?
+  githubUrl    String?
+  achievements String?
+  startDate    String?
+  endDate      String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Certification {
+  id           String   @id @default(cuid())
+  resumeId     String
+  name         String
+  issuer       String?
+  issueDate    String?
+  expiryDate   String?
+  credentialId String?
+  credentialUrl String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Language {
+  id        String   @id @default(cuid())
+  resumeId  String
+  name      String
+  level     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model Award {
+  id          String   @id @default(cuid())
+  resumeId    String
+  title       String
+  issuer      String?
+  date        String?
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+}
+
+model CoverLetter {
+  id          String   @id @default(cuid())
+  userId      String
+  resumeId    String?
+  title       String   @default("Cover Letter")
+  company     String?
+  position    String?
+  content     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  @@index([userId, updatedAt])
+}
