@@ -206,3 +206,63 @@ test('password changes and one-time local recovery invalidate sessions', async (
 });
 
 
+
+test('signed billing webhooks enforce store, mode, ordering and cancellation expiry', async () => {
+  const { createHmac } = require('node:crypto');
+  const vars = { LEMONSQUEEZY_API_KEY: 'test-only', LEMONSQUEEZY_STORE_ID: '10', LEMONSQUEEZY_WEBHOOK_SECRET: 'test-secret', LEMONSQUEEZY_PRO_VARIANT_ID: '20', LEMONSQUEEZY_PREMIUM_VARIANT_ID: '30', LEMONSQUEEZY_TEST_MODE: 'true' };
+  const old = Object.fromEntries(Object.keys(vars).map(k => [k, process.env[k]]));
+  Object.assign(process.env, vars);
+  const billingUser = await register('billing@example.test');
+  const event = { meta: { event_name: 'subscription_created', custom_data: { user_id: billingUser.id } }, data: { type: 'subscriptions', id: '100', attributes: { store_id: 10, variant_id: 20, test_mode: true, status: 'active', ends_at: null, updated_at: '2026-10-03T10:00:00Z' } } };
+  async function send(payload, signature) {
+    const body = JSON.stringify(payload);
+    return fetch(`${base}/api/billing/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': signature || createHmac('sha256', vars.LEMONSQUEEZY_WEBHOOK_SECRET).update(body).digest('hex') }, body });
+  }
+  try {
+    assert.equal((await send(event, 'bad')).status, 401);
+    event.data.attributes.test_mode = false;
+    assert.equal((await send(event)).status, 400);
+    event.data.attributes.test_mode = true;
+    assert.equal((await send(event)).status, 200);
+    assert.equal((await request('/api/auth/me', { cookie: billingUser.cookie })).data.user.plan, 'pro');
+    assert.equal((await request('/api/auth/account', { method: 'DELETE', cookie: billingUser.cookie, body: { password: 'ExamplePass123!' } })).response.status, 409);
+    await prisma.subscription.update({ where: { id: '100' }, data: { status: 'cancelled', endsAt: new Date(Date.now() - 1000) } });
+    assert.equal((await request('/api/auth/me', { cookie: billingUser.cookie })).data.user.plan, 'free');
+    assert.equal((await send(event)).status, 200);
+    event.data.attributes.status = 'expired';
+    event.data.attributes.updated_at = '2026-10-03T11:00:00Z';
+    assert.equal((await send(event)).status, 200);
+    event.data.attributes.status = 'active';
+    event.data.attributes.updated_at = '2026-10-03T10:00:00Z';
+    assert.equal((await send(event)).status, 200);
+    assert.equal((await request('/api/auth/me', { cookie: billingUser.cookie })).data.user.plan, 'free');
+    assert.equal(await prisma.subscription.count({ where: { id: '100' } }), 1);
+  } finally {
+    for (const [key, value] of Object.entries(old)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+});
+
+test('configured email sends recovery privately and the link is single use', async () => {
+  const oldKey = process.env.RESEND_API_KEY, oldFrom = process.env.EMAIL_FROM;
+  process.env.RESEND_API_KEY = 'fake-test-key'; process.env.EMAIL_FROM = 'CV <noreply@example.test>';
+  const originalFetch = global.fetch;
+  let sent;
+  global.fetch = async (url, options) => {
+    if (url === 'https://api.resend.com/emails') { sent = JSON.parse(options.body); return new Response(JSON.stringify({ id: 'test' }), { status: 200 }); }
+    return originalFetch(url, options);
+  };
+  try {
+    const result = await request('/api/auth/forgot-password', { method: 'POST', body: { email: userA.email } });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.data.developmentResetUrl, undefined);
+    assert.deepEqual(sent.to, [userA.email]);
+    const token = sent.text.match(/token=([A-Za-z0-9_-]+)/)[1];
+    const body = { token, password: 'UpdatedPassword123!' };
+    assert.equal((await request('/api/auth/reset-password', { method: 'POST', body })).response.status, 200);
+    assert.equal((await request('/api/auth/reset-password', { method: 'POST', body })).response.status, 400);
+  } finally {
+    global.fetch = originalFetch;
+    if (oldKey === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = oldKey;
+    if (oldFrom === undefined) delete process.env.EMAIL_FROM; else process.env.EMAIL_FROM = oldFrom;
+  }
+});

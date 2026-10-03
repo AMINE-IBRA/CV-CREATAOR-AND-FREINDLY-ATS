@@ -9,6 +9,7 @@ import { registerSchema, loginSchema, profileSchema, passwordSchema, preferences
 import { config, planFor } from '../lib/config';
 import { rateLimit } from '../middleware/rateLimit';
 import { usageFor } from '../lib/usage';
+import { emailConfigured, sendPasswordReset } from '../services/providers';
 
 const router = Router();
 const userSelect = { id: true, email: true, name: true, plan: true, avatarUrl: true, preferences: true, createdAt: true, aiUsageCount: true } as const;
@@ -86,27 +87,41 @@ router.delete('/account', authenticate, asyncRoute(async (req: AuthRequest, res)
   const input = z.object({ password: z.string().min(1).max(100) }).parse(req.body);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
   if (!await bcrypt.compare(input.password, user.passwordHash)) throw new HttpError(400, 'Password is incorrect.');
+  const renewingSubscription = await prisma.subscription.findFirst({ where: { userId: user.id, status: { notIn: ['expired', 'cancelled', 'canceled'] } } });
+  if (renewingSubscription) throw new HttpError(409, 'Cancel your subscription in the billing portal before deleting your account.');
   await prisma.user.delete({ where: { id: user.id } });
   clearSession(res); res.json({ message: 'Your account and its documents have been deleted.' });
 }));
 router.post('/forgot-password', rateLimit(5, 15 * 60 * 1000), asyncRoute(async (req, res) => {
   const { email } = z.object({ email: z.string().trim().email().max(254) }).parse(req.body);
-  if (config.production) throw new HttpError(503, 'Password recovery requires an email provider. Contact the application owner.', 'EMAIL_NOT_CONFIGURED');
-  requireLocalDevelopment(req);
+  if (!emailConfigured()) {
+    if (config.production) throw new HttpError(503, 'Password recovery requires an email provider. Contact the application owner.', 'EMAIL_NOT_CONFIGURED');
+    requireLocalDevelopment(req);
+  }
   const user = await userByEmail(email);
-  const message = 'If this account exists, a development reset link is available below. No email was sent.';
+  const message = emailConfigured() ? 'If this account exists, a password reset email has been requested. Check your inbox and spam folder.' : 'If this account exists, a development reset link is available below. No email was sent.';
   if (!user) { res.json({ message }); return; }
   const token = randomBytes(32).toString('base64url');
   await prisma.$transaction([
     prisma.passwordReset.deleteMany({ where: { userId: user.id } }),
     prisma.passwordReset.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000) } }),
   ]);
-  res.json({ message, developmentResetUrl: `${config.clientUrl.replace(/\/$/, '')}/reset-password?token=${token}` });
+  const resetUrl = `${config.clientUrl.replace(/\/$/, '')}/reset-password?token=${token}`;
+  if (emailConfigured()) {
+    try { await sendPasswordReset(user.email, resetUrl, hashToken(token)); }
+    catch {
+      await prisma.passwordReset.deleteMany({ where: { tokenHash: hashToken(token) } });
+      console.error('Password reset email delivery failed');
+    }
+    res.json({ message });
+  } else res.json({ message, developmentResetUrl: resetUrl });
 }));
 router.post('/reset-password', rateLimit(10, 15 * 60 * 1000), asyncRoute(async (req, res) => {
   const { token, password } = z.object({ token: z.string().min(1).max(256), password: passwordSchema }).parse(req.body);
-  if (config.production) throw new HttpError(503, 'Password recovery requires an email provider.', 'EMAIL_NOT_CONFIGURED');
-  requireLocalDevelopment(req);
+  if (!emailConfigured()) {
+    if (config.production) throw new HttpError(503, 'Password recovery requires an email provider.', 'EMAIL_NOT_CONFIGURED');
+    requireLocalDevelopment(req);
+  }
   const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: hashToken(token) } });
   if (!reset || reset.expiresAt.getTime() < Date.now()) throw new HttpError(400, 'This reset link has expired or was already used.');
   const passwordHash = await bcrypt.hash(password, 12);
@@ -119,3 +134,4 @@ router.post('/reset-password', rateLimit(10, 15 * 60 * 1000), asyncRoute(async (
   clearSession(res); res.json({ message: 'Password reset. You can now sign in with the new password.' });
 }));
 export default router;
+

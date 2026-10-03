@@ -8,7 +8,7 @@ import authRouter from './routes/auth';
 import resumeRouter from './routes/resumes';
 import coverLetterRouter from './routes/coverLetters';
 import uploadRouter from './routes/upload';
-import billingRouter from './routes/billing';
+import billingRouter, { billingWebhook } from './routes/billing';
 import { createAiRouter } from './routes/ai';
 import type { AiServices } from './services/openrouter';
 import { rateLimit } from './middleware/rateLimit';
@@ -31,6 +31,7 @@ export function createApp(options: { ai?: AiServices; serveClient?: boolean } = 
     next();
   });
   app.use('/api', rateLimit(300, 60 * 1000));
+  app.post('/api/billing/webhook', ...billingWebhook);
   app.use(express.json({ limit: '4mb' }));
   app.use(express.urlencoded({ extended: false, limit: '4mb' }));
   app.get('/api/health', (_req, res) => { res.json({ status: 'ok', timestamp: new Date().toISOString() }); });

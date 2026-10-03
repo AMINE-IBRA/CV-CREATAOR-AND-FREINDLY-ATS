@@ -28,6 +28,34 @@ model User {
   sessions      Session[]
   aiUsageRecords AiUsageRecord[]
   passwordResets PasswordReset[]
+  subscriptions Subscription[]
+  billingCheckouts BillingCheckout[]
+}
+
+model Subscription {
+  id String @id
+  userId String
+  plan String
+  status String
+  endsAt DateTime?
+  providerUpdatedAt DateTime
+  testMode Boolean
+  provider String @default("legacy")
+  customerId String @default("")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model BillingCheckout {
+  id String @id
+  userId String
+  plan String
+  testMode Boolean
+  transactionId String? @unique
+  pendingKey String? @unique
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, testMode])
 }
 
 model Session {

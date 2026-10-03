@@ -1,4 +1,5 @@
 import { config as loadEnv } from 'dotenv';
+import { billingConfigured, billingSettings, emailConfigured } from '../services/providers';
 loadEnv();
 
 // SQLite paths resolve relative to the Prisma schema directory. Production can
@@ -38,10 +39,11 @@ export function publicConfig() {
   return {
     ai: { configured: config.aiConfigured, model: config.aiModel },
     // Provider setup is deliberately explicit; no mock charges or emails.
-    billing: { configured: false, developmentMode: !config.production, message: 'Subscriptions are not available until a payment provider is connected. Development plan previews do not charge money.' },
-    email: { configured: false, developmentMode: !config.production, message: 'Production password recovery requires an email provider. Development mode provides a local reset link.' },
+    billing: { configured: billingConfigured(), testMode: billingSettings().testMode, clientToken: billingConfigured() ? billingSettings().token : null, developmentMode: !config.production && !billingConfigured(), message: billingConfigured() ? 'Subscriptions are managed through Paddle.' : 'Subscriptions are not available until a payment provider is connected.' },
+    email: { configured: emailConfigured(), developmentMode: !config.production && !emailConfigured(), message: emailConfigured() ? 'Password recovery is delivered by email.' : 'Production password recovery requires an email provider.' },
     plans,
     supportedUploadTypes: ['.pdf', '.docx'],
     maxUploadSizeMB: config.maxUploadBytes / 1024 / 1024,
   };
 }
+

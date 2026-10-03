@@ -58,8 +58,8 @@ export interface PlanEntitlements {
 }
 export interface AppConfig {
   ai: { configured: boolean; model: string };
-  billing: { configured: boolean; developmentMode?: boolean; message?: string };
-  email: { configured: boolean; message?: string };
+  billing: { testMode?: boolean; configured: boolean; developmentMode?: boolean; message?: string };
+  email: { developmentMode?: boolean; configured: boolean; message?: string };
   plans: Record<string, PlanEntitlements>;
   supportedUploadTypes: string[];
   maxUploadSizeMB: number;

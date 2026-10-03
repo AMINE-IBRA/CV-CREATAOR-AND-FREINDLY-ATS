@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { config } from '../lib/config';
 import { asyncRoute, HttpError } from '../lib/errors';
+import { refreshSubscriptionPlan } from '../services/subscriptions';
 
 export interface AuthRequest extends Request {
   user?: { id: string; email: string; name: string; plan: string };
@@ -37,5 +38,7 @@ export const authenticate = asyncRoute(async (req: AuthRequest, res, next) => {
     clearSession(res);
     throw new HttpError(401, 'Your session has expired. Please sign in again.', 'AUTH_REQUIRED');
   }
-  req.user = session.user; req.sessionId = session.id; next();
+  await refreshSubscriptionPlan(session.user.id);
+  const current = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id }, select: { id: true, email: true, name: true, plan: true } });
+  req.user = current; req.sessionId = session.id; next();
 });

@@ -17,3 +17,31 @@ SQLite migrations run during startup, when the persistent volume is mounted. A f
 The Docker build excludes local `.env` files, databases, generated output, and dependencies. Production billing and email integrations remain separate setup work.
 
 See [Railway build and start commands](https://docs.railway.com/builds/build-and-start-commands).
+
+## Payments and recovery email
+
+The app supports Lemon Squeezy subscriptions and Resend password recovery. They remain disabled until their environment variables are provided. Never commit credentials.
+
+### Lemon Squeezy
+
+1. Create recurring Pro and Premium products in your store. Choose their prices and billing intervals in Lemon Squeezy; the app does not override prices.
+2. In Railway Variables set `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_STORE_ID`, `LEMONSQUEEZY_PRO_VARIANT_ID`, `LEMONSQUEEZY_PREMIUM_VARIANT_ID`, and `LEMONSQUEEZY_WEBHOOK_SECRET`.
+3. Keep `LEMONSQUEEZY_TEST_MODE=true` while testing, with products/API credentials from the corresponding store mode. Test mode is the default.
+4. Create a webhook pointing to `https://YOUR_DOMAIN/api/billing/webhook`, with the same signing secret. Subscribe to `subscription_created`, `subscription_updated`, `subscription_cancelled`, `subscription_resumed`, `subscription_expired`, `subscription_paused`, and `subscription_unpaused`.
+5. Test a checkout, verify the account plan changes, then cancel and expire the test subscription. Checkout redirects never grant access: only signed subscription notifications do. Replayed or older notifications do not overwrite newer subscription state.
+6. Once the store is activated and testing passes, supply live variant IDs/credentials and set `LEMONSQUEEZY_TEST_MODE=false`. Existing subscribers manage cancellation and payment details through the Pricing page's Manage subscription button. Do not create a second checkout for an existing subscription.
+
+Access is retained for active/trial subscriptions and cancelled subscriptions until `ends_at`; other statuses use the free plan. Configure allowed upgrade variants in the customer portal. Deleted application accounts cannot be matched by later webhooks; cancel billing in the portal before deleting an account.
+
+Official reference: https://docs.lemonsqueezy.com/api/checkouts/create-checkout
+Webhook guide: https://docs.lemonsqueezy.com/guides/developer-guide/webhooks
+
+### Resend
+
+Verify a sender domain in Resend using the DNS records shown in its dashboard. Set `RESEND_API_KEY` and `EMAIL_FROM` (for example `CV Creator Pro <support@your-domain.com>`) in Railway. `CLIENT_URL` must be the final HTTPS application origin. Never use an unverified arbitrary sender. Test delivery to an inbox you control, then test reset and one-time token reuse rejection. Production responses never expose reset links, and tokens expire in one hour.
+
+Official reference: https://resend.com/docs/api-reference/emails/send-email
+
+### AI
+
+Set `OPENROUTER_API_KEY` in Railway; `OPENROUTER_MODEL` is optional. Keep provider usage limits appropriate to your budget. A configured key still needs valid provider credit and model access.
