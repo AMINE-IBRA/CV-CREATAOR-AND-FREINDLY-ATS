@@ -1,7 +1,6 @@
 export const SITE = {
   name: 'CV Creator Pro',
-  operator: 'EL IBRAHIMI MOHAMED AMINE',
-  location: 'Berrechid, Morocco',
+  operator: 'AMINE',
   supportEmail: 'mohamedamineelibrahimi1@gmail.com',
   lastUpdated: 'October 4, 2026',
   plans: {

@@ -7,14 +7,14 @@ import { rateLimit } from '../middleware/rateLimit';
 import { asyncRoute, HttpError } from '../lib/errors';
 import { aiInputs, resumeSchema } from '../lib/schemas';
 import { reserveAiUsage, settleAiUsage } from '../lib/usage';
-import { createResume, normalizeResume, ownedResume, validatedContent } from '../lib/resumeStore';
+import { checkTemplate, createResume, normalizeResume, ownedResume, validatedContent } from '../lib/resumeStore';
 import { aiServices, AiServices, outputSchemas } from '../services/openrouter';
 
 export function createAiRouter(services: AiServices = aiServices) {
   const router = Router();
   router.use(authenticate);
   const limiter = rateLimit(12, 60 * 1000, req => req.user.id);
-  function execute(feature: string, schema: z.ZodTypeAny, handler: (input: any, req: AuthRequest) => Promise<any>, entitlement?: 'advancedAnalysis' | 'coverLetters' | 'interview' | 'tailoring') {
+  function execute(feature: string, schema: z.ZodTypeAny, handler: (input: any, req: AuthRequest) => Promise<any>, entitlement?: 'advancedAnalysis' | 'coverLetters' | 'interview' | 'tailoring', persistResult = true) {
     router.post(`/${feature}`, limiter, asyncRoute(async (req: AuthRequest, res) => {
       const input = schema.parse(req.body);
       if (entitlement && !planFor(req.user!.plan)[entitlement]) throw new HttpError(403, 'This AI tool requires a Pro subscription.', 'PLAN_REQUIRED');
@@ -25,7 +25,7 @@ export function createAiRouter(services: AiServices = aiServices) {
       if (selected) await prisma.aiUsageRecord.update({ where: { id: usage.id }, data: { resumeId: selected.id, title: selected.title } });
       try {
         const result = await handler(input, req);
-        await settleAiUsage(usage, true, result);
+        await settleAiUsage(usage, true, persistResult ? result : undefined);
         res.status(feature === 'tailor' ? 201 : 200).json(result);
       } catch (error) {
         await settleAiUsage(usage, false);
@@ -66,6 +66,14 @@ export function createAiRouter(services: AiServices = aiServices) {
     const resume = await createResume(req.user!.id, req.user!.plan, tailored);
     return { resume: normalizeResume(resume), changes: changes.changes };
   }, 'tailoring');
+  execute('chat-edit', aiInputs.chatEdit, async (input, req) => {
+    const result = validated(outputSchemas.chatEdit, await services.editResumeChat({ resume: input.resume, messages: input.messages, allowedTemplateIds: planFor(req.user!.plan).templates }));
+    // Treat omitted fields as unchanged. This also protects editor settings if a model
+    // returns a partial document despite being asked for a complete resume.
+    const resume = validated(resumeSchema, { ...input.resume, ...result.resume });
+    checkTemplate(resume, req.user!.plan);
+    return { resume, reply: result.reply };
+  }, undefined, false);
   router.get('/history', asyncRoute(async (req: AuthRequest, res) => {
     const query = z.object({ limit: z.coerce.number().int().min(1).max(100).default(20), cursor: z.string().max(128).optional() }).parse(req.query);
     if (query.cursor && !await prisma.aiUsageRecord.findFirst({ where: { id: query.cursor, userId: req.user!.id } })) throw new HttpError(404, 'History page not found.');

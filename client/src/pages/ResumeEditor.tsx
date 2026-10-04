@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Check, ChevronLeft, Copy, Download, Eye, GripVertical, Loader2, Plus, Redo2, Save, Sparkles, Trash2, Undo2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronLeft, Copy, Download, Eye, GripVertical, Loader2, MessageCircle, Plus, Redo2, Save, Send, Sparkles, Trash2, Undo2, X } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import ResumeCreationWizard from '../components/ResumeCreationWizard';
 import { TEMPLATE_LIST, getTemplate } from '../components/templates/ResumeTemplates';
@@ -10,10 +10,11 @@ import { useResumeEditor } from '../lib/useResumeEditor';
 import { api } from '../lib/api';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ENTRY_FIELDS, SECTION_IDS, SECTION_LABELS, parseEnabledSections, parseSectionOrder, resumeBlocks, resumeToText } from '../types/resume';
+import { ENTRY_FIELDS, SECTION_IDS, SECTION_LABELS, normalizeResume, parseEnabledSections, parseSectionOrder, resumeBlocks, resumePayload, resumeToText } from '../types/resume';
 import type { Resume, RelationKey, SectionId } from '../types/resume';
 
 type EditableEntry = Record<string,string|number|boolean|undefined>;
+type ChatMessage = { role: 'user' | 'assistant'; content: string };
 const relationFor:Record<Exclude<SectionId,'summary'>,RelationKey>={experience:'experiences',education:'educations',skills:'skills',projects:'projects',certifications:'certifications',languages:'languages',awards:'awards',publications:'publications',volunteer:'volunteer',interests:'interests',references:'references'};
 const fieldLabels:Record<string,string>={jobTitle:'Job title',company:'Company',location:'Location',employmentType:'Employment type',startDate:'Start date',endDate:'End date',description:'Description / responsibilities',achievements:'Verified achievements',technologies:'Technologies',institution:'Institution',degree:'Degree',fieldOfStudy:'Field of study',grade:'Grade / GPA',name:'Name',category:'Category',level:'Level',projectUrl:'Project URL',githubUrl:'GitHub URL',issuer:'Issuer',issueDate:'Issue date',expiryDate:'Expiry date',credentialId:'Credential ID',credentialUrl:'Credential URL',title:'Title',date:'Date',publisher:'Publisher',url:'URL',organization:'Organization',role:'Role',position:'Position',email:'Email',phone:'Phone'};
 const longFields=new Set(['description','achievements']);
@@ -24,13 +25,14 @@ export default function ResumeEditor({isNew}:{isNew?:boolean}){return isNew?<Res
 function ExistingResumeEditor(){
   const {id}=useParams();const navigate=useNavigate();const toast=useToast();const {user}=useAuth();
   const {resume,loading,error,saveStatus,save,update,undo,redo,historyCount,recovery,restore,discardRecovery}=useResumeEditor(id);
-  const [panel,setPanel]=useState<'content'|'design'|'sections'|'job'>('content'),[mobilePreview,setMobilePreview]=useState(false);
+  const [panel,setPanel]=useState<'content'|'design'|'sections'|'job'|'chat'>('content'),[mobilePreview,setMobilePreview]=useState(false);
   const [previewURL,setPreviewURL]=useState(''),[previewError,setPreviewError]=useState(''),[previewBusy,setPreviewBusy]=useState(false);
   const previewURLRef=useRef(''),currentResume=useRef<Resume|null>(resume);currentResume.current=resume;
   const [exporting,setExporting]=useState(''),[aiBusy,setAiBusy]=useState(''),[suggestion,setSuggestion]=useState<AISuggestion|null>(null);
   const suggestionDialog=useRef<HTMLDivElement>(null);
   const [aiConfigured,setAiConfigured]=useState<boolean|null>(null),[job,setJob]=useState(''),[aiResult,setAiResult]=useState<Record<string,unknown>|null>(null);
   const [tone,setTone]=useState('professional');
+  const [chatMessages,setChatMessages]=useState<ChatMessage[]>([]),[chatInput,setChatInput]=useState(''),[chatBusy,setChatBusy]=useState(false);
   const documentIdentity=useRef(id);documentIdentity.current=id;
   const signature=resume?JSON.stringify({...resume,updatedAt:undefined,completionScore:undefined}):'';
   useEffect(()=>{let active=true;void api.get<{ai:{configured:boolean}}>('/config').then(r=>{if(active)setAiConfigured(r.ai.configured);}).catch(()=>{if(active)setAiConfigured(false);});return()=>{active=false;};},[]);
@@ -44,7 +46,7 @@ function ExistingResumeEditor(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[signature]);
   useEffect(()=>()=>{if(previewURLRef.current)URL.revokeObjectURL(previewURLRef.current);},[]);
-  useEffect(()=>{setSuggestion(null);setAiResult(null);},[id]);
+  useEffect(()=>{setSuggestion(null);setAiResult(null);setChatMessages([]);setChatInput('');setChatBusy(false);},[id]);
   useEffect(()=>{
     if(!suggestion)return;const previous=document.activeElement as HTMLElement|null;
     const focusable=()=>Array.from(suggestionDialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input,textarea,select')||[]);
@@ -72,6 +74,26 @@ function ExistingResumeEditor(){
       if(format==='docx')await exportTextDOCX({title:snapshot.fullName||snapshot.title,subtitle:[snapshot.professionalTitle,[snapshot.email,snapshot.phone,[snapshot.city,snapshot.country].filter(Boolean).join(', '),snapshot.linkedinUrl,snapshot.githubUrl,snapshot.portfolioUrl].filter(Boolean).join(' · ')].filter(Boolean).join('\n'),sections:resumeBlocks(snapshot).map(block=>({heading:block.heading,text:block.entries.map(entry=>[entry.title,entry.subtitle,entry.date,...entry.lines,...entry.links||[]].filter(Boolean).join('\n')).join('\n\n')})),filename:`${filename}.docx`,...{paperSize:snapshot.paperSize,fontFamily:snapshot.fontFamily,fontSize:snapshot.fontSize,pageMargin:snapshot.pageMargin,lineSpacing:snapshot.lineSpacing}});
       toast.success(`${format.toUpperCase()} downloaded`);
     }catch(err){toast.error('Export failed',err instanceof Error?err.message:'Could not create file');}finally{setExporting('');}
+  }
+  async function sendChatMessage(){
+    const message=chatInput.trim(),snapshot=currentResume.current;
+    if(!message||!snapshot||chatBusy||aiConfigured===false)return;
+    const identity=id,nextMessages=[...chatMessages,{role:'user' as const,content:message}].slice(-12);
+    setChatInput('');setChatMessages(nextMessages);setChatBusy(true);
+    try{
+      const result=await api.post<{resume:Partial<Resume>;reply:string}>('/ai/chat-edit',{resumeId:snapshot.id,resume:{...resumePayload(snapshot),photoUrl:undefined},messages:nextMessages});
+      if(documentIdentity.current!==identity)return;
+      const latest=currentResume.current;
+      if(latest&&JSON.stringify(resumePayload(latest))!==JSON.stringify(resumePayload(snapshot))){
+        setChatMessages([...nextMessages,{role:'assistant' as const,content:'Your CV changed while I was working, so I did not apply this result. Please send your request again to include the latest edits.'}].slice(-12));
+        toast.warning('Your CV changed','The AI result was not applied, so your latest edits stay safe.');return;
+      }
+      const updated=normalizeResume({...snapshot,...result.resume,photoUrl:snapshot.photoUrl});
+      if(JSON.stringify(resumePayload(updated))!==JSON.stringify(resumePayload(snapshot)))update(updated);
+      setChatMessages([...nextMessages,{role:'assistant' as const,content:result.reply}].slice(-12));
+    }catch(err){
+      if(documentIdentity.current===identity){setChatMessages([...nextMessages,{role:'assistant' as const,content:'I could not apply that change. Your resume was left as it was. Please try again.'}].slice(-12));toast.error('AI edit failed',err instanceof Error?err.message:'Try again');}
+    }finally{if(documentIdentity.current===identity)setChatBusy(false);}
   }
   async function summaryAI(){
     const snapshot=currentResume.current;if(!snapshot)return;setAiBusy('summary');const identity=id;
@@ -115,7 +137,7 @@ function ExistingResumeEditor(){
     <div className="lg:hidden flex bg-white dark:bg-slate-800 border-b"><button onClick={()=>setMobilePreview(false)} className={`flex-1 py-3 font-medium ${!mobilePreview?'text-blue-600':''}`}>Edit</button><button onClick={()=>setMobilePreview(true)} className={`flex-1 py-3 font-medium flex items-center justify-center gap-2 ${mobilePreview?'text-blue-600':''}`}><Eye className="w-4 h-4"/>Preview</button></div>
     <div className="flex flex-1 min-h-0">
       <aside className={`w-full lg:w-[460px] xl:w-[500px] flex-shrink-0 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 ${mobilePreview?'hidden lg:block':''}`}>
-        <nav aria-label="Editor panels" className="grid grid-cols-4 border-b border-slate-200 dark:border-slate-700 sticky top-[69px] bg-white dark:bg-slate-800 z-10">{(['content','design','sections','job'] as const).map(tab=><button key={tab} onClick={()=>setPanel(tab)} aria-current={panel===tab?'page':undefined} className={`py-3 text-sm capitalize font-medium ${panel===tab?'text-blue-600 border-b-2 border-blue-600':'text-slate-500'}`}>{tab==='job'?'ATS & job':tab}</button>)}</nav>
+        <nav aria-label="Editor panels" className="grid grid-cols-5 border-b border-slate-200 dark:border-slate-700 sticky top-[69px] bg-white dark:bg-slate-800 z-10">{(['content','design','sections','job','chat'] as const).map(tab=><button key={tab} onClick={()=>setPanel(tab)} aria-current={panel===tab?'page':undefined} className={`py-3 text-sm capitalize font-medium ${panel===tab?'text-blue-600 border-b-2 border-blue-600':'text-slate-500'}`}>{tab==='job'?'ATS & job':tab==='chat'?'AI chat':tab}</button>)}</nav>
         <div className="p-4 space-y-4">
           {panel==='content'&&<>
             <div className="card p-4"><div className="flex justify-between text-sm font-medium mb-2"><span>Resume completeness</span><span>{completion}%</span></div><div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{width:`${completion}%`}}/></div><p className="text-xs text-slate-500 mt-3">{checklist.filter(([,filled])=>!filled).map(([label])=>label).join(' · ')||'Core details are filled in. Review your wording before applying.'}</p></div>
@@ -137,6 +159,19 @@ function ExistingResumeEditor(){
             <div className="grid grid-cols-2 gap-4"><label className="label">Accent color<input className="mt-1 w-full h-10 rounded-lg cursor-pointer" type="color" value={resume.accentColor} onChange={e=>update({accentColor:e.target.value})}/></label>{([['fontFamily','Font',[['Helvetica','Sans serif'],['Times-Roman','Serif'],['Courier','Monospace']]],['fontSize','Text size',[['small','Small'],['medium','Medium'],['large','Large']]],['pageMargin','Margins',[['narrow','Narrow'],['normal','Normal'],['wide','Wide']]],['lineSpacing','Line spacing',[['compact','Compact'],['normal','Normal'],['relaxed','Relaxed']]],['paperSize','Paper size',[['a4','A4'],['letter','US Letter']]]] as [keyof Resume,string,string[][]][]).map(([field,label,options])=><label key={field} className="label">{label}<select className="input mt-1" value={String(resume[field])} onChange={e=>update({[field]:e.target.value})}>{options.map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></label>)}</div><p className="text-xs text-slate-500">The preview uses the same generated PDF as your download. DOCX uses a simple editable document layout.</p>
           </>}
           {panel==='sections'&&<><h2 className="font-semibold">Order and visibility</h2><p className="text-sm text-slate-500">Drag a section or use the arrow buttons. Hidden sections stay saved but do not appear in downloads or AI analysis.</p>{order.map((section,index)=><div key={section} className="flex items-center gap-2 card p-3" onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();const from=Number(event.dataTransfer.getData('application/cv-section'));if(Number.isInteger(from)&&from>=0&&from<SECTION_IDS.length)moveSection(from,index);}}><button draggable onDragStart={event=>event.dataTransfer.setData('application/cv-section',String(index))} className="btn-ghost btn-sm cursor-grab" aria-label={`Drag ${SECTION_LABELS[section]}`}><GripVertical className="w-4 h-4"/></button><label className="flex-1 flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled[section]} onChange={e=>update({enabledSections:{...enabled,[section]:e.target.checked}})}/>{SECTION_LABELS[section]}</label><button onClick={()=>moveSection(index,index-1)} disabled={index===0} aria-label={`Move ${SECTION_LABELS[section]} up`} className="btn-ghost btn-sm"><ArrowUp className="w-4 h-4"/></button><button onClick={()=>moveSection(index,index+1)} disabled={index===order.length-1} aria-label={`Move ${SECTION_LABELS[section]} down`} className="btn-ghost btn-sm"><ArrowDown className="w-4 h-4"/></button></div>)}</>}
+          {panel==='chat'&&<section aria-labelledby="resume-ai-chat-title" className="space-y-4">
+            <div><h2 id="resume-ai-chat-title" className="font-semibold flex items-center gap-2"><MessageCircle className="w-4 h-4 text-violet-600"/>Chat with AI editor</h2><p className="text-sm text-slate-500 mt-1">Ask for any change to this CV: wording, details, sections, ordering, or design. The AI applies it directly; use Undo if you want to revert.</p></div>
+            <div aria-live="polite" aria-label="AI editing conversation" className="space-y-3 max-h-[42vh] min-h-24 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              {chatMessages.length===0&&<p className="text-sm text-slate-500">Examples: Make my summary shorter; add English and French to languages; change the accent color to navy.</p>}
+              {chatMessages.map((item,index)=><div key={index} className={'flex '+(item.role==='user'?'justify-end':'justify-start')}><p className={item.role==='user'?'max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm bg-blue-600 text-white':'max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100'}>{item.content}</p></div>)}
+              {chatBusy&&<div role="status" className="flex items-center gap-2 text-sm text-violet-600"><Loader2 className="w-4 h-4 animate-spin"/>Updating your CV...</div>}
+            </div>
+            <form onSubmit={event=>{event.preventDefault();void sendChatMessage();}} className="space-y-2">
+              <label className="sr-only" htmlFor="resume-ai-chat-input">Tell the AI what to change in your CV</label>
+              <textarea id="resume-ai-chat-input" className="textarea min-h-[100px]" value={chatInput} maxLength={4000} onChange={event=>setChatInput(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();void sendChatMessage();}}} placeholder="Tell the AI exactly what you want changed..." disabled={chatBusy||aiConfigured===false}/>
+              <div className="flex items-center justify-between gap-2"><span className="text-xs text-slate-500">Your CV and chat are sent to the AI service to make the requested edit.</span><button className="btn-primary btn-sm shrink-0" type="submit" disabled={chatBusy||!chatInput.trim()||aiConfigured===false}>{chatBusy?<Loader2 className="w-4 h-4 animate-spin"/>:<Send className="w-4 h-4"/>}Apply</button></div>
+            </form>
+          </section>}
           {panel==='job'&&<><h2 className="font-semibold">Review and tailor</h2><p className="text-sm text-slate-500">Scores are AI estimates, not results from an employer's ATS. Add keywords only when they describe your real experience.</p><label className="label">Job description<textarea className="textarea min-h-[180px] mt-1" value={job} maxLength={30000} onChange={e=>setJob(e.target.value)} placeholder="Paste the job description here."/></label><div className="flex gap-2 flex-wrap">{aiButton('Resume review',()=>void analyze('review'),'review')}{aiButton('Job match',()=>void analyze('job-match'),'job-match')}{aiButton('Keyword gaps',()=>void analyze('keywords'),'keywords')}{aiButton('Create tailored copy',()=>void analyze('tailor'),'tailor')}</div>{aiResult&&<div className="space-y-4 card p-4">{Object.entries(aiResult).map(([key,value])=><div key={key}><h3 className="font-semibold text-sm capitalize mb-2">{key.replace(/([A-Z])/g,' $1')}</h3>{typeof value==='number'?<p className="font-bold text-xl text-blue-600">{value}% <span className="text-xs font-normal text-slate-500">estimated</span></p>:Array.isArray(value)?<ul className="space-y-2 text-sm">{value.map((item,index)=><li key={index} className="p-2 bg-slate-50 dark:bg-slate-900 rounded-lg">{typeof item==='string'?item:item&&typeof item==='object'?Object.values(item).filter(v=>typeof v==='string').join(' — '):String(item)}</li>)}</ul>:typeof value==='string'?<p className="text-sm">{value}</p>:null}</div>)}</div>}</>}
           {aiConfigured===false&&<p role="status" className="text-xs text-amber-700 dark:text-amber-400">AI is not configured on this server. Editing and exports are available.</p>}
         </div>

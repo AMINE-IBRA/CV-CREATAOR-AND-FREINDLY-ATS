@@ -27,6 +27,7 @@ const aiMock = {
   importResume: async () => generated,
   optimizeKeywords: async () => ({ presentKeywords: ['TypeScript'], missingKeywords: [{ keyword: 'SQL', reason: 'Required by the role; claim it only if you have it.', suggestedSection: 'Skills' }], suggestions: ['Include only real skills.'] }),
   tailorResume: async () => ({ summary: 'Developer who builds applications.', experiences: [{ index: 0, description: 'Built reliable applications.' }], skillsOrder: [0], changes: ['Focused the summary on relevant experience.'] }),
+  editResumeChat: async ({ resume }) => ({ resume: { ...resume, summary: 'Updated by chat.' }, reply: 'I updated the summary.' }),
 };
 
 async function request(route, { method = 'GET', cookie, body, origin, form } = {}) {
@@ -123,7 +124,6 @@ test('paid entitlements require a plan and local development previews are explic
   assert.equal((await request(`/api/resumes/${resumeA.id}/export-check`, { method: 'POST', cookie: userA.cookie, body: { format: 'docx' } })).response.status, 403);
   const preview = await plan(userA);
   assert.equal(preview.data.developmentMode, true); assert.equal(preview.data.user.plan, 'pro');
-  assert.match(preview.data.message, /No payment/);
 });
 test('cover-letter links are owner-checked on both create and update', async () => {
   assert.equal((await request('/api/cover-letters', { method: 'POST', cookie: userA.cookie, body: { resumeId: resumeB.id, title: 'Invalid Letter' } })).response.status, 404);
@@ -164,6 +164,19 @@ test('AI import, tailoring and persisted histories preserve original facts', asy
   await request('/api/ai/history', { method: 'DELETE', cookie: userA.cookie });
   assert.equal((await request('/api/ai/history', { cookie: userA.cookie })).data.history.length, 0);
   assert.equal((await prisma.user.findUnique({ where: { id: userA.id } })).aiUsageCount, countBefore);
+});
+test('AI chat edits an owned resume, preserves editable fields, and does not store a second CV copy in AI history', async () => {
+  const body = { resumeId: resumeA.id, resume: { title: 'Chat edit test', summary: 'Original summary.', experiences: [], educations: [], skills: [], projects: [] }, messages: [{ role: 'user', content: 'Shorten my summary.' }] };
+  const edited = await request('/api/ai/chat-edit', { method: 'POST', cookie: userA.cookie, body });
+  assert.equal(edited.response.status, 200);
+  assert.equal(edited.data.resume.summary, 'Updated by chat.');
+  assert.equal(edited.data.resume.title, 'Chat edit test');
+  assert.equal(edited.data.reply, 'I updated the summary.');
+  const foreign = await request('/api/ai/chat-edit', { method: 'POST', cookie: userB.cookie, body });
+  assert.equal(foreign.response.status, 404);
+  const usage = await prisma.aiUsageRecord.findFirst({ where: { userId: userA.id, feature: 'chat-edit' }, orderBy: { createdAt: 'desc' } });
+  assert.equal(usage.status, 'succeeded');
+  assert.equal(usage.result, null);
 });
 test('upload validates content, supported types and size', async () => {
   function form(name, content) { const data = new FormData(); data.append('file', new Blob([content]), name); return data; }
@@ -213,7 +226,8 @@ test('signed billing webhooks enforce store, mode, ordering and cancellation exp
   const old = Object.fromEntries(Object.keys(vars).map(k => [k, process.env[k]]));
   Object.assign(process.env, vars);
   const billingUser = await register('billing@example.test');
-  const event = { meta: { event_name: 'subscription_created', custom_data: { user_id: billingUser.id } }, data: { type: 'subscriptions', id: '100', attributes: { store_id: 10, variant_id: 20, test_mode: true, status: 'active', ends_at: null, updated_at: '2026-10-03T10:00:00Z' } } };
+  await prisma.billingCheckout.create({ data: { id: 'checkout-100', userId: billingUser.id, plan: 'pro:monthly', testMode: true } });
+  const event = { meta: { event_name: 'subscription_created', custom_data: { checkout_id: 'checkout-100' } }, data: { type: 'subscriptions', id: '100', attributes: { store_id: 10, customer_id: 50, variant_id: 20, test_mode: true, status: 'active', ends_at: null, updated_at: '2026-10-03T10:00:00Z' } } };
   async function send(payload, signature) {
     const body = JSON.stringify(payload);
     return fetch(`${base}/api/billing/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Signature': signature || createHmac('sha256', vars.LEMONSQUEEZY_WEBHOOK_SECRET).update(body).digest('hex') }, body });

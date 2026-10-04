@@ -61,4 +61,10 @@ export const aiInputs = {
   generateResume: z.object({ basicInfo: inputText() }),
   importResume: z.object({ text: inputText(60000) }),
   tailor: z.object({ resumeId: inputText(128), jobDescription: inputText(25000), title: z.string().trim().min(1).max(160).optional() }),
+  chatEdit: z.object({
+    resumeId: inputText(128),
+    resume: resumeSchema,
+    messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: inputText(4000) })).min(1).max(12)
+      .refine(messages => messages.at(-1)?.role === 'user', 'The latest chat message must be from the user.'),
+  }),
 };
