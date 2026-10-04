@@ -5,115 +5,127 @@ import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { asyncRoute, HttpError } from '../lib/errors';
 import { config } from '../lib/config';
+import { isOwner } from '../lib/owner';
 import { publicUser, requireLocalDevelopment } from './auth';
-import { billingConfigured, billingSettings, paddleRequest } from '../services/providers';
+import { billingConfigured, billingSettings, lemonRequest } from '../services/providers';
 import { refreshSubscriptionPlan, validSignature } from '../services/subscriptions';
 import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
-const paddleId = (prefix: string) => z.string().regex(new RegExp(`^${prefix}_[a-z0-9]{26}$`));
 function requireBilling() { if (!billingConfigured()) throw new HttpError(503, 'Paid subscriptions are not available yet.', 'BILLING_NOT_CONFIGURED'); }
-function portalUrl(value: unknown) {
-  if (typeof value !== 'string') throw new HttpError(502, 'Paddle did not return a portal link.');
+function billingUrl(value: unknown) {
+  if (typeof value !== 'string') throw new HttpError(502, 'Billing did not return a link.');
   const url = new URL(value);
-  if (url.protocol !== 'https:' || !['customer-portal.paddle.com', 'sandbox-customer-portal.paddle.com'].includes(url.hostname)) throw new HttpError(502, 'Invalid billing portal link.');
+  if (url.protocol !== 'https:' || !(url.hostname === 'lemonsqueezy.com' || url.hostname.endsWith('.lemonsqueezy.com'))) throw new HttpError(502, 'Invalid billing link.');
   return url.href;
 }
+router.post('/owner-plan', authenticate, asyncRoute(async (req: AuthRequest, res) => {
+  if (!isOwner(req.user!.id)) throw new HttpError(403, 'Owner access required.');
+  const { plan } = z.object({ plan: z.enum(['free', 'pro', 'premium']).nullable() }).parse(req.body);
+  await prisma.user.update({ where: { id: req.user!.id }, data: { ownerPreviewPlan: plan } });
+  await refreshSubscriptionPlan(req.user!.id, true);
+  res.json({ user: publicUser((await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } }))) });
+}));
 router.post('/development-plan', authenticate, asyncRoute(async (req: AuthRequest, res) => {
   requireLocalDevelopment(req);
   if (billingConfigured()) throw new HttpError(409, 'Use the billing portal when a provider is configured.');
   const { plan } = z.object({ plan: z.enum(['free', 'pro', 'premium']) }).parse(req.body);
   const user = await prisma.user.update({ where: { id: req.user!.id }, data: { plan } });
-  res.json({ user: publicUser(user), developmentMode: true, message: 'Development plan preview changed. No payment was made.' });
+  res.json({ user: publicUser(user), developmentMode: true });
 }));
 router.get('/status', authenticate, asyncRoute(async (req: AuthRequest, res) => {
-  const subscription = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'paddle', testMode: billingSettings().testMode }, orderBy: { providerUpdatedAt: 'desc' } });
-  res.json({ hasSubscription: Boolean(subscription), status: subscription?.status || null, plan: req.user!.plan });
+  const subscription = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'lemonsqueezy', testMode: billingSettings().testMode }, orderBy: { providerUpdatedAt: 'desc' } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } });
+  res.json({ hasSubscription: Boolean(subscription), status: subscription?.status || null, plan: user.plan, ownerPreviewPlan: isOwner(user.id) ? user.ownerPreviewPlan : null });
 }));
 router.post('/checkout', authenticate, rateLimit(10, 60000, req => req.user.id), asyncRoute(async (req: AuthRequest, res) => {
   requireBilling();
-  const { plan } = z.object({ plan: z.enum(['pro', 'premium']) }).parse(req.body);
+  const { plan, interval } = z.object({ plan: z.enum(['pro', 'premium']), interval: z.enum(['monthly', 'annual']).default('monthly') }).parse(req.body);
   const b = billingSettings();
-  const existing = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'paddle', testMode: b.testMode, status: { not: 'canceled' } } });
+  const variant = b.variants[plan][interval];
+  if (!variant) throw new HttpError(503, 'This billing interval is not available yet.');
+  const existing = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'lemonsqueezy', testMode: b.testMode, status: { not: 'expired' } } });
   if (existing) throw new HttpError(409, 'Manage your existing subscription in the billing portal.');
-  const pendingKey = `${req.user!.id}:${b.testMode ? 'sandbox' : 'production'}`;
+  const pendingKey = req.user!.id + ':' + b.testMode;
   const pending = await prisma.billingCheckout.findUnique({ where: { pendingKey } });
-  if (pending) {
-    if (!pending.transactionId) throw new HttpError(409, 'Your checkout is being prepared. Please try again shortly or contact support.');
-    const transaction = await paddleRequest(`/transactions/${pending.transactionId}`);
-    if (['draft', 'ready'].includes(transaction.data?.status)) {
-      if (pending.plan !== plan) throw new HttpError(409, `You already have a ${pending.plan} checkout. Resume that checkout or contact support to change it.`);
-      res.json({ transactionId: pending.transactionId }); return;
-    }
-    if (transaction.data?.status !== 'canceled') throw new HttpError(409, 'Your payment is being confirmed. Please refresh your account shortly.');
-    await prisma.billingCheckout.update({ where: { id: pending.id }, data: { pendingKey: null } });
+  if (pending && Date.now() - pending.createdAt.getTime() < 3600000) {
+    if (!pending.transactionId) throw new HttpError(409, 'A checkout is being prepared. Please try again shortly.');
+    if (pending.plan !== plan + ':' + interval) throw new HttpError(409, 'An earlier checkout is still open. Resume it or wait one hour before changing the plan.');
+    const result = await lemonRequest('/checkouts/' + encodeURIComponent(pending.transactionId));
+    res.json({ url: billingUrl(result.data?.attributes?.url) }); return;
   }
+  if (pending) await prisma.billingCheckout.update({ where: { id: pending.id }, data: { pendingKey: null } });
   const checkoutId = randomUUID();
-  try { await prisma.billingCheckout.create({ data: { id: checkoutId, userId: req.user!.id, plan, testMode: b.testMode, pendingKey } }); }
-  catch (error: any) { if (error?.code === 'P2002') throw new HttpError(409, 'A checkout is already being prepared. Please try again shortly.'); throw error; }
-  // Persist the owner before contacting Paddle. A timeout must not cause a second chargeable transaction.
-  const result = await paddleRequest('/transactions', {
-    items: [{ price_id: b.prices[plan], quantity: 1 }], collection_mode: 'automatic',
-    custom_data: { checkout_id: checkoutId }, checkout: { url: `${config.clientUrl.replace(/\/$/, '')}/checkout` },
-  });
-  const transactionId = paddleId('txn').parse(result?.data?.id);
+  try { await prisma.billingCheckout.create({ data: { id: checkoutId, userId: req.user!.id, plan: plan + ':' + interval, testMode: b.testMode, pendingKey } }); }
+  catch (e: any) { if (e.code === 'P2002') throw new HttpError(409, 'A checkout is already being prepared.'); throw e; }
+  try {
+  const result = await lemonRequest('/checkouts', { data: {
+    type: 'checkouts',
+    attributes: {
+      checkout_data: { email: req.user!.email, custom: { checkout_id: checkoutId } },
+      product_options: { enabled_variants: [Number(variant)], redirect_url: config.clientUrl.replace(/\/$/, '') + '/pricing?payment=received' },
+      test_mode: b.testMode, expires_at: new Date(Date.now() + 3600000).toISOString(),
+    },
+    relationships: { store: { data: { type: 'stores', id: b.storeId } }, variant: { data: { type: 'variants', id: variant } } },
+  } });
+  const transactionId = z.string().uuid().parse(result.data?.id);
+  const url = billingUrl(result.data?.attributes?.url);
   await prisma.billingCheckout.update({ where: { id: checkoutId }, data: { transactionId } });
-  res.json({ transactionId });
-}));
-router.get('/checkout/:transactionId', authenticate, asyncRoute(async (req: AuthRequest, res) => {
-  requireBilling();
-  const transactionId = paddleId('txn').parse(req.params.transactionId);
-  const checkout = await prisma.billingCheckout.findFirst({ where: { transactionId, userId: req.user!.id, testMode: billingSettings().testMode } });
-  if (!checkout) throw new HttpError(404, 'Checkout not found for this account.');
-  res.json({ transactionId });
+  res.json({ url });
+  } catch (error) {
+    // Checkout creation does not charge a card. Keep the nonce for any late
+    // signed notification but allow retry when no usable URL was returned.
+    await prisma.billingCheckout.update({ where: { id: checkoutId }, data: { pendingKey: null } });
+    throw error;
+  }
 }));
 router.post('/portal', authenticate, asyncRoute(async (req: AuthRequest, res) => {
   requireBilling();
-  const subscription = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'paddle', testMode: billingSettings().testMode }, orderBy: { providerUpdatedAt: 'desc' } });
+  const b = billingSettings();
+  const subscription = await prisma.subscription.findFirst({ where: { userId: req.user!.id, provider: 'lemonsqueezy', testMode: b.testMode }, orderBy: { providerUpdatedAt: 'desc' } });
   if (!subscription) throw new HttpError(404, 'No subscription found for this account.');
-  const result = await paddleRequest(`/customers/${paddleId('ctm').parse(subscription.customerId)}/portal-sessions`, { subscription_ids: [subscription.id] });
-  res.json({ url: portalUrl(result?.data?.urls?.general?.overview) });
+  const result = await lemonRequest('/subscriptions/' + encodeURIComponent(subscription.id));
+  const a = result.data?.attributes;
+  if (String(a?.store_id) !== b.storeId || String(a?.customer_id) !== subscription.customerId || a?.test_mode !== b.testMode) throw new HttpError(502, 'Billing account mismatch.');
+  res.json({ url: billingUrl(a?.urls?.customer_portal) });
 }));
-
-const subscriptionEvent = z.object({
-  event_type: z.string(), occurred_at: z.string().datetime({ offset: true }),
-  data: z.object({
-    id: paddleId('sub'), customer_id: paddleId('ctm'),
-    status: z.enum(['active', 'trialing', 'past_due', 'paused', 'canceled']),
-    items: z.array(z.object({ price: z.object({ id: paddleId('pri') }), quantity: z.number().int().positive() })).min(1),
-    transaction_id: paddleId('txn').optional(),
-    custom_data: z.object({ checkout_id: z.string() }).passthrough().nullable().optional(),
-    scheduled_change: z.object({ action: z.string(), effective_at: z.string().datetime({ offset: true }) }).passthrough().nullable().optional(),
-  }).passthrough(),
+const eventSchema = z.object({
+  meta: z.object({ event_name: z.string(), custom_data: z.object({ checkout_id: z.string().optional() }).passthrough().optional() }),
+  data: z.object({ type: z.literal('subscriptions'), id: z.string().regex(/^\d+$/), attributes: z.object({
+    store_id: z.number().int(), customer_id: z.number().int(), variant_id: z.number().int(), test_mode: z.boolean(),
+    status: z.enum(['active', 'on_trial', 'cancelled', 'expired', 'past_due', 'unpaid', 'paused']),
+    ends_at: z.string().datetime({ offset: true }).nullable(), updated_at: z.string().datetime({ offset: true }),
+  }).passthrough() }),
 });
 export const billingWebhook = [raw({ type: 'application/json', limit: '256kb' }), asyncRoute(async (req, res) => {
   requireBilling();
   const b = billingSettings();
-  if (!Buffer.isBuffer(req.body) || !validSignature(req.body, req.get('Paddle-Signature') || '', b.secret)) throw new HttpError(401, 'Invalid webhook signature.');
+  if (!Buffer.isBuffer(req.body) || !validSignature(req.body, req.get('X-Signature') || '', b.secret)) throw new HttpError(401, 'Invalid webhook signature.');
   let event: any;
   try { event = JSON.parse(req.body.toString('utf8')); } catch { throw new HttpError(400, 'Invalid webhook payload.'); }
-  if (typeof event.event_type !== 'string') throw new HttpError(400, 'Missing event type.');
-  if (!event.event_type.startsWith('subscription.')) { res.sendStatus(200); return; }
-  const parsed = subscriptionEvent.parse(event);
-  const a = parsed.data;
-  const updatedAt = new Date(parsed.occurred_at);
-  const price = a.items.length === 1 && a.items[0].quantity === 1 ? a.items[0].price.id : '';
-  const plan = price === b.prices.pro ? 'pro' : price === b.prices.premium ? 'premium' : 'free';
-  const endsAt = a.scheduled_change && ['cancel', 'pause'].includes(a.scheduled_change.action) ? new Date(a.scheduled_change.effective_at) : null;
+  if (typeof event.meta?.event_name !== 'string') throw new HttpError(400, 'Missing event type.');
+  if (!event.meta.event_name.startsWith('subscription_')) { res.sendStatus(200); return; }
+  // Payment events are not subscription objects.
+  if (event.data?.type !== 'subscriptions') { res.sendStatus(200); return; }
+  const parsed = eventSchema.parse(event);
+  const a = parsed.data.attributes;
+  if (String(a.store_id) !== b.storeId || a.test_mode !== b.testMode) throw new HttpError(400, 'Billing environment mismatch.');
+  const selected = Object.entries(b.variants).flatMap(([plan, intervals]) => Object.entries(intervals).map(([interval, id]) => ({ plan, interval, id }))).find(v => v.id === String(a.variant_id));
+  if (!selected) throw new HttpError(400, 'Unknown product variant.');
+  const updatedAt = new Date(a.updated_at);
   const userId = await prisma.$transaction(async tx => {
-    const old = await tx.subscription.findUnique({ where: { id: a.id } });
-    if (old && (old.provider !== 'paddle' || old.testMode !== b.testMode || old.customerId !== a.customer_id)) throw new HttpError(400, 'Subscription identity mismatch.');
-    const checkout = a.custom_data?.checkout_id ? await tx.billingCheckout.findUnique({ where: { id: a.custom_data.checkout_id } }) : null;
-    if (!old && !checkout) return null; // Unrelated/deleted account: never grant access from client-supplied user IDs.
-    if (!old && checkout) {
-      if (checkout.testMode !== b.testMode) throw new HttpError(400, 'Checkout environment mismatch.');
-      if (parsed.event_type !== 'subscription.created') throw new HttpError(503, 'Awaiting the subscription creation event.');
-      if (!a.transaction_id || (checkout.transactionId && checkout.transactionId !== a.transaction_id)) throw new HttpError(400, 'Checkout transaction mismatch.');
-      if (checkout.plan !== plan) throw new HttpError(400, 'Checkout price mismatch.');
-    }
+    const old = await tx.subscription.findUnique({ where: { id: parsed.data.id } });
+    if (old && (old.provider !== 'lemonsqueezy' || old.testMode !== b.testMode || old.customerId !== String(a.customer_id))) throw new HttpError(400, 'Subscription identity mismatch.');
+    const checkout = parsed.meta.custom_data?.checkout_id ? await tx.billingCheckout.findUnique({ where: { id: parsed.meta.custom_data.checkout_id } }) : null;
+    if (!old && !checkout) return null;
+    if (!old && checkout && (checkout.testMode !== b.testMode || checkout.plan !== selected.plan + ':' + selected.interval)) throw new HttpError(400, 'Checkout mismatch.');
+    if (old && checkout && old.userId !== checkout.userId) throw new HttpError(400, 'Checkout owner mismatch.');
     const owner = old?.userId || checkout!.userId;
     if (old && old.providerUpdatedAt >= updatedAt) return owner;
-    await tx.subscription.upsert({ where: { id: a.id }, create: { id: a.id, userId: owner, provider: 'paddle', customerId: a.customer_id, plan, status: a.status, endsAt, providerUpdatedAt: updatedAt, testMode: b.testMode }, update: { plan, status: a.status, endsAt, providerUpdatedAt: updatedAt } });
+    await tx.subscription.upsert({ where: { id: parsed.data.id }, create: {
+      id: parsed.data.id, userId: owner, provider: 'lemonsqueezy', customerId: String(a.customer_id), plan: selected.plan,
+      status: a.status, endsAt: a.ends_at ? new Date(a.ends_at) : null, providerUpdatedAt: updatedAt, testMode: b.testMode,
+    }, update: { plan: selected.plan, status: a.status, endsAt: a.ends_at ? new Date(a.ends_at) : null, providerUpdatedAt: updatedAt } });
     if (checkout) await tx.billingCheckout.update({ where: { id: checkout.id }, data: { pendingKey: null } });
     return owner;
   });

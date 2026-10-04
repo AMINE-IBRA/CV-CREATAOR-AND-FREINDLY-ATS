@@ -20,6 +20,8 @@ const CareerAssistant = lazy(() => import('./pages/CareerAssistant'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
+const RefundPage = lazy(() => import('./pages/RefundPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const PasswordRecoveryPage = lazy(() => import('./pages/PasswordRecoveryPage'));
 
@@ -85,6 +87,8 @@ export default function App() {
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
+            <Route path="/refunds" element={<RefundPage />} />
+            <Route path="/contact" element={<ContactPage />} />
 
             {/* Auth routes */}
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />

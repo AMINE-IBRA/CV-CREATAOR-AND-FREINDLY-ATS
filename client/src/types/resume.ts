@@ -22,7 +22,7 @@ export interface Resume {
   publications?: Publication[]; volunteer?: Volunteer[]; interests?: Interest[]; references?: Reference[];
   createdAt: string; updatedAt: string;
 }
-export interface User { id: string; email: string; name: string; plan: string; avatarUrl?: string; aiUsageCount?: number; createdAt?: string }
+export interface User { id: string; email: string; name: string; plan: string; isOwner?: boolean; avatarUrl?: string; aiUsageCount?: number; createdAt?: string }
 export interface CoverLetter { id: string; userId: string; resumeId?: string; title: string; company?: string; position?: string; content?: string; createdAt: string; updatedAt: string }
 
 export const SECTION_LABELS = {

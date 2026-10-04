@@ -1,31 +1,32 @@
 import { HttpError } from '../lib/errors';
 
 export const billingSettings = () => ({
-  key: process.env.PADDLE_API_KEY?.trim() || '',
-  token: process.env.PADDLE_CLIENT_TOKEN?.trim() || '',
-  secret: process.env.PADDLE_WEBHOOK_SECRET?.trim() || '',
-  testMode: process.env.PADDLE_ENVIRONMENT !== 'production',
-  prices: { pro: process.env.PADDLE_PRO_PRICE_ID?.trim() || '', premium: process.env.PADDLE_PREMIUM_PRICE_ID?.trim() || '' },
+  key: process.env.LEMONSQUEEZY_API_KEY?.trim() || '',
+  storeId: process.env.LEMONSQUEEZY_STORE_ID?.trim() || '',
+  secret: process.env.LEMONSQUEEZY_WEBHOOK_SECRET?.trim() || '',
+  testMode: process.env.LEMONSQUEEZY_TEST_MODE !== 'false',
+  variants: {
+    pro: { monthly: process.env.LEMONSQUEEZY_PRO_VARIANT_ID?.trim() || '', annual: process.env.LEMONSQUEEZY_PRO_ANNUAL_VARIANT_ID?.trim() || '' },
+    premium: { monthly: process.env.LEMONSQUEEZY_PREMIUM_VARIANT_ID?.trim() || '', annual: process.env.LEMONSQUEEZY_PREMIUM_ANNUAL_VARIANT_ID?.trim() || '' },
+  },
 });
 export function billingConfigured() {
   const b = billingSettings();
-  const tokenPrefix = b.testMode ? 'test_' : 'live_';
-  return Boolean(b.key && b.secret && b.token.startsWith(tokenPrefix) && /^pri_[a-z0-9]{26}$/.test(b.prices.pro) && /^pri_[a-z0-9]{26}$/.test(b.prices.premium) && b.prices.pro !== b.prices.premium);
+  const ids = Object.values(b.variants).flatMap(v => Object.values(v)).filter(Boolean);
+  return Boolean(b.key && b.secret && /^\d+$/.test(b.storeId) && /^\d+$/.test(b.variants.pro.monthly) && /^\d+$/.test(b.variants.premium.monthly) && ids.every(id => /^\d+$/.test(id)) && new Set(ids).size === ids.length);
 }
 export const emailConfigured = () => Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim());
 
-export async function paddleRequest(path: string, body?: unknown) {
-  const settings = billingSettings();
-  const host = settings.testMode ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
+export async function lemonRequest(path: string, body?: unknown) {
   let response: Response;
   try {
-    response = await fetch(`${host}${path}`, {
+    response = await fetch('https://api.lemonsqueezy.com/v1' + path, {
       method: body === undefined ? 'GET' : 'POST', signal: AbortSignal.timeout(15000),
-      headers: { Authorization: `Bearer ${settings.key}`, 'Paddle-Version': '1', 'Content-Type': 'application/json' },
+      headers: { Authorization: 'Bearer ' + billingSettings().key, Accept: 'application/vnd.api+json', 'Content-Type': 'application/vnd.api+json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-  } catch { throw new HttpError(502, 'Paddle could not be reached. Please try again.'); }
-  if (!response.ok) throw new HttpError(502, 'Paddle is temporarily unavailable. Please try again.');
+  } catch { throw new HttpError(502, 'Billing could not be reached. Please try again.'); }
+  if (!response.ok) throw new HttpError(502, 'Billing is temporarily unavailable. Please contact support if this continues.');
   return response.json() as Promise<any>;
 }
 

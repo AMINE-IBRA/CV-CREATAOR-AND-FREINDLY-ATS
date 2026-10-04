@@ -10,13 +10,14 @@ import { config, planFor } from '../lib/config';
 import { rateLimit } from '../middleware/rateLimit';
 import { usageFor } from '../lib/usage';
 import { emailConfigured, sendPasswordReset } from '../services/providers';
+import { isOwner } from '../lib/owner';
 
 const router = Router();
 const userSelect = { id: true, email: true, name: true, plan: true, avatarUrl: true, preferences: true, createdAt: true, aiUsageCount: true } as const;
 export function publicUser(user: any) {
   let preferences: Record<string, string> = { theme: 'system', language: 'en', defaultTemplateId: 'classic-professional' };
   try { preferences = { ...preferences, ...preferencesSchema.parse(JSON.parse(user.preferences || '{}')) }; } catch { /* Defaults preserve old accounts. */ }
-  return { id: user.id, email: user.email, name: user.name, plan: user.plan, avatarUrl: user.avatarUrl, preferences, createdAt: user.createdAt, aiUsageCount: user.aiUsageCount };
+  return { id: user.id, email: user.email, name: user.name, plan: user.plan, isOwner: isOwner(user.id), avatarUrl: user.avatarUrl, preferences, createdAt: user.createdAt, aiUsageCount: user.aiUsageCount };
 }
 async function userByEmail(email: string) {
   const matches = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM "User" WHERE lower("email") = ${email.toLowerCase()} LIMIT 1`;

@@ -18,6 +18,7 @@ model User {
   avatarUrl     String?
   preferences   String    @default("{\"theme\":\"system\",\"language\":\"en\",\"defaultTemplateId\":\"classic-professional\"}")
   plan          String    @default("free")
+  ownerPreviewPlan String?
   aiUsageCount  Int       @default(0)
   aiUsageReset  DateTime  @default(now())
   createdAt     DateTime  @default(now())

@@ -16,6 +16,6 @@ export default function PublicLayout({ children, title, description }: { childre
       <h1 className="text-3xl font-bold mb-3">{title}</h1>{description && <p className="text-muted max-w-3xl mb-8">{description}</p>}
       {children}
     </main>
-    <footer className="max-w-7xl mx-auto border-t border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-6 text-sm text-muted flex flex-wrap justify-between gap-4"><span>© {new Date().getFullYear()} CV Creator Pro</span><div className="flex gap-4"><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div></footer>
+    <footer className="max-w-7xl mx-auto border-t border-slate-200 dark:border-slate-700 px-4 sm:px-6 py-6 text-sm text-muted flex flex-wrap justify-between gap-4"><span>© {new Date().getFullYear()} CV Creator Pro</span><div className="flex flex-wrap gap-4"><Link to="/contact">Contact</Link><Link to="/refunds">Refunds</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div></footer>
   </div>;
 }

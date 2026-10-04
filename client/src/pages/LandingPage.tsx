@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   FileText, Sparkles, Target, Download, CheckCircle, ArrowRight,
-  Star, BarChart2, Layers,
+  BarChart2, Layers,
   ChevronDown, Menu, X
 } from 'lucide-react';
 import { useState } from 'react';
@@ -9,14 +9,14 @@ import { useState } from 'react';
 const TEMPLATES_PREVIEW = [
   { name: 'Classic Professional', color: '#2563EB', accent: '#1e40af' },
   { name: 'Modern Minimalist', color: '#059669', accent: '#047857' },
-  { name: 'Software Engineer', color: '#7C3AED', accent: '#6d28d9' },
-  { name: 'Executive', color: '#1e293b', accent: '#0f172a' },
-  { name: 'Graduate', color: '#0891b2', accent: '#0e7490' },
-  { name: 'Creative Pro', color: '#dc2626', accent: '#b91c1c' },
+  { name: 'Technical Compact', color: '#7C3AED', accent: '#6d28d9' },
+  { name: 'Executive Serif', color: '#1e293b', accent: '#0f172a' },
+  { name: 'Graduate Focus', color: '#0891b2', accent: '#0e7490' },
+  { name: 'Creative Banner', color: '#dc2626', accent: '#b91c1c' },
 ];
 
 const FEATURES = [
-  { icon: Sparkles, title: 'AI-Powered Writing', desc: 'Generate professional summaries, enhance bullet points, and tailor your resume for any job using OpenRouter AI.' },
+  { icon: Sparkles, title: 'AI-Powered Writing', desc: 'Generate professional summaries, enhance bullet points, and tailor your resume for your next application.' },
   { icon: Target, title: 'ATS Optimization', desc: 'Analyze your resume against job descriptions and identify critical keywords to improve your application.' },
   { icon: Layers, title: '12 Professional Templates', desc: 'Choose from classic, modern, and visual layouts, including dedicated ATS-focused designs.' },
   { icon: Download, title: 'Document Export', desc: 'Download a resume with selectable PDF text. Plain text is included; DOCX is available on Pro.' },
@@ -31,17 +31,11 @@ const HOW_IT_WORKS = [
   { step: '04', title: 'Download & Apply', desc: 'Export your polished, ATS-friendly resume as a PDF and start applying.' },
 ];
 
-const TESTIMONIALS = [
-  { name: 'Sarah M.', role: 'Software Engineer', text: '[Sample review] The AI summary generator saved me hours. My resume finally sounds professional and targeted.', stars: 5 },
-  { name: 'James K.', role: 'Marketing Manager', text: '[Sample review] The ATS analysis helped me understand exactly what keywords were missing from my applications.', stars: 5 },
-  { name: 'Priya L.', role: 'Data Scientist', text: '[Sample review] I went from zero interviews to multiple callbacks after using the job match feature to tailor my resume.', stars: 5 },
-];
-
 const FAQS = [
   { q: 'Are the resumes really ATS-friendly?', a: 'Our ATS-focused templates use single-column layouts, standard headings, and selectable text to maximize parsing compatibility. However, no tool can guarantee results with every employer\'s ATS system.' },
-  { q: 'How does the AI work?', a: 'We use the OpenRouter API to connect to advanced language models. All AI requests are processed server-side — your API key is never exposed in the browser.' },
+  { q: 'How does the AI work?', a: 'Optional AI tools help refine text and compare it with a job description. Review every suggestion before using it. Your experience and qualifications stay under your control.' },
   { q: 'How is my data used?', a: 'Your documents are stored in your account. When you request AI assistance, relevant content is sent to OpenRouter and the configured model provider. You can edit, export, or delete your saved data in Settings. Read our Privacy Policy for details.' },
-  { q: 'What\'s included in the free plan?', a: 'The free plan includes up to 3 resumes, 6 templates, basic AI features (20 uses/month), and PDF export.' },
+  { q: 'What\'s included in the free plan?', a: 'The free plan includes up to 3 resumes, 3 templates, basic AI features (20 uses/month), and PDF export.' },
   { q: 'Can I import my existing resume?', a: 'Yes! You can upload a PDF or DOCX file. We extract the text and help you organize it into our structured format using AI.' },
 ];
 
@@ -75,6 +69,8 @@ export default function LandingPage() {
             </div>
 
             <button
+              aria-label="Toggle navigation"
+              aria-expanded={menuOpen}
               onClick={() => setMenuOpen(!menuOpen)}
               className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
@@ -103,13 +99,13 @@ export default function LandingPage() {
           </div>
 
           <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-6 leading-tight tracking-tight">
-            Build Resumes That<br />
-            <span className="text-yellow-300">Get You Hired</span>
+            Present Your Experience<br />
+            <span className="text-yellow-300">With Confidence</span>
           </h1>
 
           <p className="text-xl md:text-2xl text-blue-100 mb-10 max-w-3xl mx-auto leading-relaxed">
             Create professional, ATS-optimized resumes with AI assistance.
-            Tailor every application. Land more interviews.
+            Choose a clear layout, refine your wording, and export a document you are proud to send.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
@@ -190,10 +186,10 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
-              Everything You Need to Land Your Next Role
+              A Complete Workspace for Your Resume
             </h2>
             <p className="text-xl text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
-              Powerful AI tools combined with beautiful templates to help you create the perfect resume.
+              Powerful AI tools combined with beautiful templates to help you create a clear, well-structured resume.
             </p>
           </div>
 
@@ -216,7 +212,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">Professional Templates</h2>
-            <p className="text-xl text-slate-500 dark:text-slate-400">Choose from 12 beautifully designed, templates with ATS-focused options.</p>
+            <p className="text-xl text-slate-500 dark:text-slate-400">Choose from 12 layouts, including clear single-column options for applicant tracking systems.</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -253,7 +249,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">How It Works</h2>
-            <p className="text-xl text-slate-500 dark:text-slate-400">Get your professional resume in minutes.</p>
+            <p className="text-xl text-slate-500 dark:text-slate-400">From your first draft to a document ready to review.</p>
           </div>
 
           <div className="grid md:grid-cols-4 gap-8">
@@ -282,16 +278,15 @@ export default function LandingPage() {
                 <Target className="w-4 h-4" />
                 ATS Optimization
               </div>
-              <h2 className="text-4xl font-bold mb-6">Beat the Bots. Reach Human Eyes.</h2>
+              <h2 className="text-4xl font-bold mb-6">Make Your Experience Easier to Read</h2>
               <p className="text-blue-100 text-lg leading-relaxed mb-6">
                 A clear, well-structured resume makes your experience easier to understand.
-                Our ATS analysis helps you assess relevant keywords, identify content issues,
-                and how well your resume matches the job description.
+                Compare your resume text with a job description, review keyword gaps, and check for missing or unclear content.
               </p>
               <div className="space-y-3">
                 {[
                   'Keyword gap analysis against job descriptions',
-                  'Formatting compatibility check',
+                  'Layout and content guidance',
                   'Section completeness review',
                   'Grammar and clarity suggestions',
                 ].map(item => (
@@ -302,7 +297,7 @@ export default function LandingPage() {
                 ))}
               </div>
               <p className="text-blue-300 text-xs mt-4 italic">
-                * ATS scores shown are estimated internal heuristics and do not represent actual scores from any employer's system.
+                Example scores are illustrations only. Results vary between employers and applicant systems.
               </p>
             </div>
             <div className="bg-white/10 rounded-2xl p-6 border border-white/20">
@@ -329,32 +324,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-24 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">What Users Say</h2>
-            <p className="text-slate-500 dark:text-slate-400">Sample testimonials — real reviews coming soon as we grow!</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {TESTIMONIALS.map((t) => (
-              <div key={t.name} className="card p-6">
-                <div className="flex mb-3">
-                  {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-slate-600 dark:text-slate-300 mb-4 italic">"{t.text}"</p>
-                <div>
-                  <div className="font-semibold text-slate-900 dark:text-white">{t.name}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{t.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Pricing Preview */}
       <section className="py-24 px-4 bg-slate-50 dark:bg-slate-800">
         <div className="max-w-7xl mx-auto text-center">
@@ -362,13 +331,13 @@ export default function LandingPage() {
           <p className="text-xl text-slate-500 dark:text-slate-400 mb-12">Start free. Upgrade when you need more.</p>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
-              { name: 'Free', price: '$0', features: ['3 resumes', '6 templates', '20 AI uses/month', 'PDF export'], cta: 'Get Started' },
-              { name: 'Pro', price: 'Coming soon', features: ['Unlimited resumes', 'All 12 templates', '200 AI uses/month', 'ATS analysis', 'Cover letters', 'DOCX export'], cta: 'View Plans', highlight: true },
-              { name: 'Premium', price: 'Coming soon', features: ['Everything in Pro', '1000 AI uses/month', 'All template styles', 'Interview preparation', 'AI tailoring'], cta: 'View Plans' },
+              { name: 'Free', price: '$0', features: ['3 resumes', '3 templates', '20 AI uses/month', 'PDF export'], cta: 'Get Started' },
+              { name: 'Pro', price: '$30/month', features: ['Unlimited resumes', 'All 12 templates', '200 AI uses/month', 'ATS analysis', 'Cover letters', 'DOCX export'], cta: 'View Plans', highlight: true },
+              { name: 'Premium', price: '$59.99/month', features: ['Everything in Pro', '1000 AI uses/month', 'All template styles', 'Interview preparation', 'AI tailoring'], cta: 'View Plans' },
             ].map((plan) => (
               <div key={plan.name} className={`card p-8 ${plan.highlight ? 'border-2 border-blue-500 ring-4 ring-blue-100 dark:ring-blue-900/40' : ''}`}>
                 {plan.highlight && (
-                  <div className="badge-blue mb-3">Most Popular</div>
+                  <div className="badge-blue mb-3">Expanded Workspace</div>
                 )}
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">{plan.name}</h3>
                 <div className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-6">{plan.price}</div>
@@ -402,6 +371,7 @@ export default function LandingPage() {
             {FAQS.map((faq, i) => (
               <div key={i} className="card overflow-hidden">
                 <button
+                  aria-expanded={openFaq === i}
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                   className="w-full flex items-center justify-between p-5 text-left"
                 >
@@ -422,7 +392,7 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-24 px-4 hero-gradient">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">Ready to Build Your Perfect Resume?</h2>
+          <h2 className="text-4xl font-bold text-white mb-6">Start Your Next Application With a Clear Resume</h2>
             <p className="text-xl text-blue-100 mb-10">Create a clear application that reflects your experience.</p>
           <Link to="/register" className="btn-primary btn-lg bg-white text-blue-700 hover:bg-blue-50 shadow-xl text-lg px-10 py-4">
             Start Building for Free
@@ -442,7 +412,7 @@ export default function LandingPage() {
                 </div>
                 <span className="font-bold text-white text-lg">CV Creator Pro</span>
               </div>
-              <p className="text-sm leading-relaxed">AI-powered resume builder helping professionals land their next opportunity.</p>
+              <p className="text-sm leading-relaxed">A workspace for writing, refining, and exporting your resume.</p>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
@@ -464,7 +434,7 @@ export default function LandingPage() {
               <h4 className="text-white font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li><li><Link to="/refunds" className="hover:text-white transition-colors">Refund Policy</Link></li><li><Link to="/contact" className="hover:text-white transition-colors">Contact & Support</Link></li>
               </ul>
             </div>
           </div>

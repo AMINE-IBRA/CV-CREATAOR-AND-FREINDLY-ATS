@@ -39,7 +39,7 @@ export function publicConfig() {
   return {
     ai: { configured: config.aiConfigured, model: config.aiModel },
     // Provider setup is deliberately explicit; no mock charges or emails.
-    billing: { configured: billingConfigured(), testMode: billingSettings().testMode, clientToken: billingConfigured() ? billingSettings().token : null, developmentMode: !config.production && !billingConfigured(), message: billingConfigured() ? 'Subscriptions are managed through Paddle.' : 'Subscriptions are not available until a payment provider is connected.' },
+    billing: { configured: billingConfigured(), testMode: billingSettings().testMode, intervals: { pro: { monthly: Boolean(billingSettings().variants.pro.monthly), annual: Boolean(billingSettings().variants.pro.annual) }, premium: { monthly: Boolean(billingSettings().variants.premium.monthly), annual: Boolean(billingSettings().variants.premium.annual) } }, developmentMode: !config.production && !billingConfigured(), message: billingConfigured() ? 'Subscriptions are managed through Lemon Squeezy.' : 'Paid subscriptions are not available yet.' },
     email: { configured: emailConfigured(), developmentMode: !config.production && !emailConfigured(), message: emailConfigured() ? 'Password recovery is delivered by email.' : 'Production password recovery requires an email provider.' },
     plans,
     supportedUploadTypes: ['.pdf', '.docx'],

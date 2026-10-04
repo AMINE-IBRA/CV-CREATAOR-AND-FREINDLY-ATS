@@ -1,27 +1,28 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '../lib/prisma';
+import { isOwner } from '../lib/owner';
 import { billingSettings } from './providers';
 
-export function validSignature(body: Buffer, signature: string, secret: string, now = Date.now()) {
-  if (!secret) return false;
-  const parts = signature.split(';').map(part => part.trim().split('='));
-  const timestamps = parts.filter(([key]) => key === 'ts').map(([, value]) => value);
-  if (timestamps.length !== 1 || !/^\d+$/.test(timestamps[0])) return false;
-  const timestamp = timestamps[0];
-  if (Math.abs(now / 1000 - Number(timestamp)) > 5) return false;
-  const expected = createHmac('sha256', secret).update(`${timestamp}:`).update(body).digest();
-  return parts.some(([key, value]) => key === 'h1' && /^[a-f0-9]{64}$/i.test(value || '') && timingSafeEqual(expected, Buffer.from(value, 'hex')));
+export function validSignature(body: Buffer, signature: string, secret: string) {
+  if (!secret || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  return timingSafeEqual(createHmac('sha256', secret).update(body).digest(), Buffer.from(signature, 'hex'));
 }
 export function subscriptionActive(s: { status: string; endsAt: Date | null }) {
-  return ['active', 'trialing'].includes(s.status) && (!s.endsAt || s.endsAt.getTime() > Date.now());
+  return ['active', 'on_trial'].includes(s.status) && (!s.endsAt || s.endsAt.getTime() > Date.now())
+    || s.status === 'cancelled' && Boolean(s.endsAt && s.endsAt.getTime() > Date.now());
 }
-export async function refreshSubscriptionPlan(userId: string) {
-  // Read and update in one transaction so concurrent notifications cannot leave a stale plan.
+export async function refreshSubscriptionPlan(userId: string, force = false) {
   await prisma.$transaction(async tx => {
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    if (!user) return;
+    if (isOwner(userId) && ['free', 'pro', 'premium'].includes(user.ownerPreviewPlan || '')) {
+      if (user.plan !== user.ownerPreviewPlan) await tx.user.update({ where: { id: userId }, data: { plan: user.ownerPreviewPlan! } });
+      return;
+    }
     const subscriptions = await tx.subscription.findMany({ where: { userId } });
-    if (!subscriptions.length) return;
-    const active = subscriptions.filter(s => s.provider === 'paddle' && s.testMode === billingSettings().testMode && subscriptionActive(s));
+    if (!force && !subscriptions.length && !user.ownerPreviewPlan) return;
+    const active = subscriptions.filter(s => s.provider === 'lemonsqueezy' && s.testMode === billingSettings().testMode && subscriptionActive(s));
     const plan = active.some(s => s.plan === 'premium') ? 'premium' : active.some(s => s.plan === 'pro') ? 'pro' : 'free';
-    await tx.user.updateMany({ where: { id: userId, plan: { not: plan } }, data: { plan } });
+    await tx.user.updateMany({ where: { id: userId }, data: { plan, ownerPreviewPlan: null } });
   });
 }
