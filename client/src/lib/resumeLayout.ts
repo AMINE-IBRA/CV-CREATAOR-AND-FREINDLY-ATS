@@ -19,6 +19,7 @@ export const LAYOUTS: LayoutConfig[] = [
   { id:'creative-banner', name:'Creative Banner', category:'Creative', description:'A full-width color masthead paired with crisp section rules.', accentColor:'#C2410C', atsFriendly:true, layout:'single', header:'banner', heading:'line', font:'Helvetica', size:10.5, padding:36, nameSize:31, uppercase:true },
   { id:'consultant', name:'Consultant Timeline', category:'Professional', description:'Dates lead each entry in a restrained timeline layout.', accentColor:'#0369A1', atsFriendly:false, layout:'timeline', header:'split', heading:'double', font:'Helvetica', size:10, padding:40, nameSize:27, uppercase:false },
   { id:'bold-accent', name:'Bold Accent', category:'Modern', description:'A strong edge accent and filled section bars emphasize milestones.', accentColor:'#9333EA', atsFriendly:true, layout:'single', header:'left', heading:'band', font:'Helvetica', size:10.5, padding:38, nameSize:30, uppercase:true, frame:true },
+  { id:'editorial-profile', name:'French Editorial', category:'Professional', description:'A French CV with a circular profile photo, contact sidebar and a clean timeline.', accentColor:'#18364A', atsFriendly:false, layout:'sidebar-left', header:'left', heading:'line', font:'Helvetica', size:9.5, padding:32, nameSize:31, uppercase:false },
 ];
 export function getLayout(id: string) { return LAYOUTS.find(layout => layout.id === id) || LAYOUTS[0]; }
 export function resumeMetrics(resume: Resume, config = getLayout(resume.templateId)) {

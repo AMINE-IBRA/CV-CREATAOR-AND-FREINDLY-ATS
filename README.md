@@ -248,7 +248,7 @@ npm test
 npm run lint
 ```
 
-The automated suite includes **11 backend integration tests** and **4 document tests**. Backend tests use an isolated SQLite database and mocked AI responses. Document tests exercise all twelve templates, long-document pagination, section normalization, and saved payloads.
+The automated suite includes **15 backend integration tests** and **4 document tests**. Backend tests use an isolated SQLite database and mocked AI responses. Document tests exercise all thirteen templates, long-document pagination, section normalization, and saved payloads.
 
 Browser verification during development covered registration, save/reload, delayed-save handling, document downloads, file imports, cover-letter editing, and mobile navigation. These are development verification results, not a continuously running CI status badge.
 

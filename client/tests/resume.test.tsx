@@ -49,9 +49,9 @@ test('saved payload strips editor IDs and complete plain text preserves optional
   assert.ok(!resumeToText(hidden).includes('Reference Example'));
 });
 
-test('all twelve templates produce real PDF documents', async () => {
-  assert.equal(LAYOUTS.length,12);
-  assert.equal(new Set(LAYOUTS.map(layout=>layout.id)).size,12);
+test('all thirteen templates produce real PDF documents', async () => {
+  assert.equal(LAYOUTS.length,13);
+  assert.equal(new Set(LAYOUTS.map(layout=>layout.id)).size,13);
   await mkdir(output,{recursive:true});
   for (const layout of LAYOUTS) {
     const buffer = await renderToBuffer(<ResumeDocument resume={{...fixture,templateId:layout.id,accentColor:layout.accentColor,fontFamily:layout.font}}/>);

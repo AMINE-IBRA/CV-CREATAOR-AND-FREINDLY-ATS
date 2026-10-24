@@ -47,6 +47,47 @@ export function ResumeDocument({ resume }: { resume: Resume }) {
       </View>)}</View>
     </View>;
   }
+  if(config.id==='editorial-profile'){
+    const labels:Record<string,string>={summary:'Profil',experience:'Expérience',education:'Formation',skills:'Compétences techniques',projects:'Projets',certifications:'Certifications',languages:'Langues',awards:'Distinctions',publications:'Publications',volunteer:'Bénévolat',interests:'Centres d’intérêt',references:'Références'};
+    const sideBlocks=blocks.filter(block=>SIDE_SECTIONS.has(block.id));
+    const mainBlocks=blocks.filter(block=>!SIDE_SECTIONS.has(block.id));
+    const initials=(resume.fullName||'Votre nom').split(/\s+/).map(part=>part[0]).slice(0,2).join('').toUpperCase();
+    const renderEditorialBlock=(block:ResumeBlock,side=false)=><View key={block.id} style={{marginBottom:side?13:17,position:'relative'}}>
+      <Text minPresenceAhead={24} style={{fontSize:size+1,fontWeight:700,color:'#263746',textTransform:'uppercase',letterSpacing:0.8,marginBottom:5,paddingBottom:4,borderBottomWidth:1,borderBottomColor:'#263746'}}>{labels[block.id]||block.heading}</Text>
+      {block.entries.map((entry,index)=><View key={index} wrap={false} style={{marginBottom:8,paddingLeft:side?0:8,position:'relative'}}>
+        {!side&&<View style={{position:'absolute',left:-13,top:3,width:6,height:6,borderRadius:3,backgroundColor:'#18364A'}}/>}
+        <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'}}>
+          {entry.title&&<Text style={{fontWeight:700,flexGrow:1,flexShrink:1}}>{entry.title}</Text>}
+          {entry.date&&<Text style={{fontSize:size-1,color:'#5B6570',marginLeft:5}}>{entry.date}</Text>}
+        </View>
+        {entry.subtitle&&<Text style={{color:'#384958',marginTop:2}}>{entry.subtitle}</Text>}
+        {entry.lines.map((line,lineIndex)=><Text key={lineIndex} style={{marginTop:3,textAlign:'justify'}}>{line}</Text>)}
+        {entry.links?.map((url,linkIndex)=>safeLink(url)?<Link key={linkIndex} src={safeLink(url)!} style={{fontSize:size-1,color:accent,marginTop:2}}>{url}</Link>:<Text key={linkIndex}>{url}</Text>)}
+      </View>)}
+    </View>;
+    return <Document title={resume.title||'Resume'} author={resume.fullName||undefined} subject="Professional resume">
+      <Page size={resume.paperSize==='letter'?'LETTER':'A4'} style={{fontFamily:font,fontSize:size,lineHeight:spacing,color:'#29323B',paddingTop:margin,paddingBottom:margin+12,paddingHorizontal:margin}}>
+        <View wrap={false} style={{flexDirection:'row',alignItems:'center',marginBottom:17,paddingBottom:12,borderBottomWidth:2,borderBottomColor:'#18364A'}}>
+          {photo?<Image src={photo} style={{width:76,height:76,objectFit:'cover',borderRadius:38,marginRight:16}}/>:<View style={{width:76,height:76,borderRadius:38,marginRight:16,backgroundColor:'#F1F5F7',borderWidth:1,borderColor:'#18364A',alignItems:'center',justifyContent:'center'}}><Text style={{fontSize:20,fontWeight:700,color:'#18364A'}}>{initials}</Text></View>}
+          <View style={{flexGrow:1,flexShrink:1,alignItems:'center'}}>
+            <Text style={{fontSize:config.nameSize,lineHeight:1.1,fontWeight:700,textAlign:'center',color:'#303B4B'}}>{resume.fullName||'Votre nom'}</Text>
+            <Text style={{fontSize:size+2,marginTop:5,textAlign:'center',color:'#4B5563'}}>{resume.professionalTitle||resume.targetRole||'Titre professionnel'}</Text>
+          </View>
+        </View>
+        <View style={{flexDirection:'row',alignItems:'flex-start'}}>
+          <View style={{width:'32%',paddingRight:15}}>
+            <Text style={{fontSize:size+1,fontWeight:700,color:'#263746',textTransform:'uppercase',letterSpacing:0.8,marginBottom:5,paddingBottom:4,borderBottomWidth:1,borderBottomColor:'#263746'}}>Contact</Text>
+            {contact.map((line,index)=><Text key={index} style={{marginTop:5}}>{line}</Text>)}
+            {sideBlocks.map(block=>renderEditorialBlock(block,true))}
+          </View>
+          <View style={{width:'68%',paddingLeft:17,borderLeftWidth:1,borderLeftColor:'#263746'}}>
+            {mainBlocks.map(block=>renderEditorialBlock(block))}
+          </View>
+        </View>
+        <Text fixed style={{position:'absolute',bottom:18,left:margin,right:margin,height:12,lineHeight:1.2,fontFamily:'Helvetica',textAlign:'right',fontSize:8,color:'#94a3b8'}} render={({pageNumber,totalPages})=>String(pageNumber)+' / '+String(totalPages)} />
+      </Page>
+    </Document>;
+  }
   return <Document title={resume.title || 'Resume'} author={resume.fullName || undefined} subject="Professional resume">
     <Page size={resume.paperSize==='letter'?'LETTER':'A4'} style={{fontFamily:font,fontSize:size,lineHeight:spacing,color:'#1e293b',paddingTop:margin,paddingBottom:margin+12,paddingHorizontal:margin,borderLeftWidth:config.frame?7:0,borderLeftColor:accent}}>
       <View wrap={false} style={{marginBottom:22,flexDirection:config.header==='split'?'row':'column',alignItems:config.header==='center'?'center':'stretch',justifyContent:'space-between',backgroundColor:config.header==='banner'?accent:'transparent',color:config.header==='banner'?'white':'#1e293b',padding:config.header==='banner'?15:0,paddingBottom:12,borderBottomWidth:['classic-professional','executive-serif'].includes(config.id)?2:0,borderBottomColor:accent}}>

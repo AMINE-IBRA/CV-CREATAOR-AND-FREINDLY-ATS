@@ -332,7 +332,7 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               { name: 'Free', price: '$0', features: ['3 resumes', '3 templates', '20 AI uses/month', 'PDF export'], cta: 'Get Started' },
-              { name: 'Pro', price: '$30/month', features: ['Unlimited resumes', 'All 12 templates', '200 AI uses/month', 'ATS analysis', 'Cover letters', 'DOCX export'], cta: 'View Plans', highlight: true },
+              { name: 'Pro', price: '$30/month', features: ['Unlimited resumes', 'All 13 templates', '200 AI uses/month', 'ATS analysis', 'Cover letters', 'DOCX export'], cta: 'View Plans', highlight: true },
               { name: 'Premium', price: '$59.99/month', features: ['Everything in Pro', '1000 AI uses/month', 'All template styles', 'Interview preparation', 'AI tailoring'], cta: 'View Plans' },
             ].map((plan) => (
               <div key={plan.name} className={`card p-8 ${plan.highlight ? 'border-2 border-blue-500 ring-4 ring-blue-100 dark:ring-blue-900/40' : ''}`}>

@@ -45,7 +45,7 @@ async function register(email, name = 'Example User') {
   return { ...result.data.user, cookie: result.cookie };
 }
 async function plan(user, value = 'pro') {
-  const result = await request('/api/billing/development-plan', { method: 'POST', cookie: user.cookie, body: { plan: value } });
+  const result = await request('/api/billing/owner-plan', { method: 'POST', cookie: user.cookie, body: { plan: value } });
   assert.equal(result.response.status, 200);
   return result;
 }
@@ -64,6 +64,8 @@ before(async () => {
   await new Promise(resolve => server.once('listening', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   userA = await register('a@example.test');
+  // Keep the owner ID allowlist test-only and never grant owner status by email.
+  process.env.OWNER_USER_IDS = userA.id;
   userB = await register('b@example.test');
   userCap = await register('caps@example.test');
   const a = await request('/api/resumes', { method: 'POST', cookie: userA.cookie, body: { title: 'Original Resume', fullName: 'Example Candidate', email: 'a@example.test', summary: 'Original summary.', experiences: [{ jobTitle: 'Developer', company: 'Example Company', startDate: '2022', description: 'Built applications.' }], skills: [{ name: 'TypeScript' }], publications: [{ title: 'Sample Article', publisher: 'Example Publisher' }], volunteer: [{ organization: 'Example Charity', role: 'Helper' }], interests: [{ name: 'Reading' }], references: [{ name: 'Example Reference', email: 'reference@example.test' }] } });
@@ -122,8 +124,14 @@ test('paid entitlements require a plan and local development previews are explic
   const blocked = await request('/api/ai/job-match', { method: 'POST', cookie: userA.cookie, body: { resumeText: 'Developer with TypeScript', jobDescription: 'TypeScript developer role' } });
   assert.equal(blocked.response.status, 403);
   assert.equal((await request(`/api/resumes/${resumeA.id}/export-check`, { method: 'POST', cookie: userA.cookie, body: { format: 'docx' } })).response.status, 403);
+  const editorial = await request('/api/resumes', { method: 'POST', cookie: userB.cookie, body: { title: 'Editorial sample', templateId: 'editorial-profile' } });
+  assert.equal(editorial.response.status, 201);
+  const proOnly = await request('/api/resumes', { method: 'POST', cookie: userB.cookie, body: { title: 'Pro template sample', templateId: 'executive-serif' } });
+  assert.equal(proOnly.response.status, 403);
   const preview = await plan(userA);
-  assert.equal(preview.data.developmentMode, true); assert.equal(preview.data.user.plan, 'pro');
+  assert.equal(preview.data.user.isOwner, true); assert.equal(preview.data.user.plan, 'pro');
+  const nonOwner = await request('/api/billing/development-plan', { method: 'POST', cookie: userB.cookie, body: { plan: 'premium' } });
+  assert.equal(nonOwner.response.status, 403);
 });
 test('cover-letter links are owner-checked on both create and update', async () => {
   assert.equal((await request('/api/cover-letters', { method: 'POST', cookie: userA.cookie, body: { resumeId: resumeB.id, title: 'Invalid Letter' } })).response.status, 404);

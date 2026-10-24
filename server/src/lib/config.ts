@@ -24,11 +24,11 @@ export const allowedOrigins = new Set([
 export const templateIds = [
   'classic-professional', 'modern-minimalist', 'two-column',
   'executive-serif', 'technical-compact', 'academic', 'graduate',
-  'contemporary', 'elegant-sidebar', 'creative-banner', 'consultant', 'bold-accent',
+  'contemporary', 'elegant-sidebar', 'creative-banner', 'consultant', 'bold-accent', 'editorial-profile',
 ] as const;
 
 export const plans = {
-  free: { resumeLimit: 3, aiLimit: 20, templates: templateIds.slice(0, 3), docxExport: false, tailoring: false, coverLetters: false, advancedAnalysis: false, interview: false, advancedCustomization: false },
+  free: { resumeLimit: 3, aiLimit: 20, templates: [...templateIds.slice(0, 3), 'editorial-profile'], docxExport: false, tailoring: false, coverLetters: false, advancedAnalysis: false, interview: false, advancedCustomization: false },
   pro: { resumeLimit: null, aiLimit: 200, templates: [...templateIds], docxExport: true, tailoring: true, coverLetters: true, advancedAnalysis: true, interview: true, advancedCustomization: true },
   premium: { resumeLimit: null, aiLimit: 1000, templates: [...templateIds], docxExport: true, tailoring: true, coverLetters: true, advancedAnalysis: true, interview: true, advancedCustomization: true },
 };

@@ -27,6 +27,7 @@ router.post('/owner-plan', authenticate, asyncRoute(async (req: AuthRequest, res
   res.json({ user: publicUser((await prisma.user.findUniqueOrThrow({ where: { id: req.user!.id } }))) });
 }));
 router.post('/development-plan', authenticate, asyncRoute(async (req: AuthRequest, res) => {
+  if (!isOwner(req.user!.id)) throw new HttpError(403, 'Owner access required.');
   requireLocalDevelopment(req);
   if (billingConfigured()) throw new HttpError(409, 'Use the billing portal when a provider is configured.');
   const { plan } = z.object({ plan: z.enum(['free', 'pro', 'premium']) }).parse(req.body);

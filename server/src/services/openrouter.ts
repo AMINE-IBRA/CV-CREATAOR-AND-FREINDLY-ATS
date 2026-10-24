@@ -65,10 +65,17 @@ export async function callOpenRouter(messages: Array<{ role: string; content: st
 }
 
 async function feature<T extends z.ZodTypeAny>(task: string, data: unknown, schema: T, maxTokens = 2000): Promise<z.infer<T>> {
-  const response = await callOpenRouter([
-    { role: 'system', content: `${systemRules}\n\nTASK:\n${task}` },
-    { role: 'user', content: JSON.stringify({ sourceData: data }) },
-  ], { jsonMode: true, temperature: 0.4, max_tokens: maxTokens });
+  const source = data && typeof data === 'object' ? data as Record<string, unknown> : {};
+  const isChat = Array.isArray(source.conversation);
+  const conversation = isChat ? source.conversation as Array<{ role: string; content: string }> : [];
+  const context = { ...source };
+  delete context.conversation;
+  const messages = [
+    { role: 'system', content: systemRules + '\n\nTASK:\n' + task + (isChat ? '\nMake the reply specific to the latest request; do not repeat the previous assistant reply verbatim.' : '') },
+    { role: 'user', content: JSON.stringify(isChat ? context : { sourceData: data }) },
+    ...(isChat ? conversation : []),
+  ];
+  const response = await callOpenRouter(messages, { jsonMode: true, temperature: isChat ? 0.65 : 0.4, max_tokens: maxTokens });
   const parsed = schema.safeParse(parseAiJson(response));
   if (!parsed.success) throw new HttpError(502, 'The AI response did not match the expected format. Please try again.', 'AI_RESPONSE_INVALID');
   return parsed.data;

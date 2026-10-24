@@ -26,6 +26,26 @@ const example: Resume = {
   certifications: [], languages: [{ name: 'English', level: 'Fluent' }, { name: 'French', level: 'Professional' }], awards: [],
   createdAt: '', updatedAt: '',
 };
+const editorialExample: Resume = {
+  ...example,
+  title: 'Exemple de CV',
+  templateId: 'editorial-profile',
+  fullName: 'Lina Amrani',
+  professionalTitle: 'Développeuse Full Stack junior',
+  email: 'lina@example.com',
+  phone: '+212 6XX XX XX XX',
+  city: 'Casablanca',
+  country: 'Maroc',
+  linkedinUrl: 'https://linkedin.com/in/example',
+  portfolioUrl: 'https://example.com',
+  summary: 'Étudiante en développement digital, intéressée par la création d’applications web accessibles et faciles à utiliser. À la recherche d’un stage pour mettre en pratique ses connaissances en développement front-end et back-end.',
+  sectionOrder: ['summary', 'experience', 'education', 'projects', 'skills', 'languages'],
+  experiences: [{ id: 'sample-internship', jobTitle: 'Stagiaire développeuse web', company: 'Entreprise Exemple', location: 'Casablanca', startDate: '2025', endDate: '2026', isCurrent: false, description: 'Participation à la création d’une application web de démonstration.\nCollaboration avec une petite équipe pour tester les fonctionnalités et corriger les problèmes.', achievements: 'Projet pédagogique — détails à remplacer par votre expérience réelle.' }],
+  educations: [{ institution: 'Institut Exemple', degree: 'Formation professionnelle', fieldOfStudy: 'Développement digital', startDate: '2024', endDate: '2026' }],
+  skills: [{ name: 'HTML, CSS, JavaScript', category: 'technical' }, { name: 'React et Node.js', category: 'technical' }, { name: 'Git et GitHub', category: 'tools' }, { name: 'Travail en équipe', category: 'soft' }],
+  projects: [{ name: 'Application de démonstration', description: 'Projet d’apprentissage présentant une interface web responsive.', technologies: 'React, TypeScript', projectUrl: 'https://example.com/project' }],
+  languages: [{ name: 'Arabe', level: 'Langue maternelle' }, { name: 'Français', level: 'Intermédiaire' }, { name: 'Anglais', level: 'Intermédiaire' }],
+};
 
 export default function TemplatesPage() {
   const [query, setQuery] = useState('');
@@ -64,9 +84,9 @@ export default function TemplatesPage() {
     </div>
     <p className="text-sm text-muted mb-4">{filtered.length} templates · {user?.plan ? `Your ${user.plan} plan` : 'Create an account to save your resume'}</p>
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {filtered.map(t => { const Template = t.component; return <article className="card overflow-hidden" key={t.id}>
+      {filtered.map(t => { const Template = t.component; const previewResume=t.id==='editorial-profile'?editorialExample:example; return <article className="card overflow-hidden" key={t.id}>
         <button type="button" className="w-full h-80 bg-slate-100 relative overflow-hidden text-left" onClick={() => setPreviewId(t.id)} aria-label={`Preview ${t.name}`}>
-          <div className="absolute top-3 left-1/2 origin-top" style={{ width: 794, transform: 'translateX(-50%) scale(0.29)' }}><Template resume={{ ...example, templateId: t.id, accentColor: t.accentColor }} /></div>
+          <div className="absolute top-3 left-1/2 origin-top" style={{ width: 794, transform: 'translateX(-50%) scale(0.29)' }}><Template resume={{ ...previewResume, templateId: t.id, accentColor: t.accentColor }} /></div>
         </button>
         <div className="p-4"><h2 className="font-semibold mb-2">{t.name}</h2><p className="text-xs text-muted min-h-10 mb-3">{t.description}</p><span className="text-xs inline-flex gap-1 items-center mb-4 text-blue-600">{t.atsFriendly ? <CheckCircle className="w-3 h-3" /> : <Palette className="w-3 h-3" />}{t.atsFriendly ? 'ATS-focused' : 'Visual layout'}{allowedTemplates && !allowedTemplates.includes(t.id) ? ' · Pro template' : ''}</span>
           <button className="btn-primary w-full" disabled={creating !== null} onClick={() => void selectTemplate(t.id)}>{creating === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}Use template</button>
@@ -75,7 +95,7 @@ export default function TemplatesPage() {
     </div>
     {filtered.length === 0 && <div className="card p-12 text-center"><p className="text-muted mb-4">No templates match your search.</p><button className="btn-secondary" onClick={() => { setQuery(''); setCategory('all'); setAtsOnly(false); }}>Clear filters</button></div>}
     {selected && <div className="fixed inset-0 z-50 bg-black/60 overflow-y-auto p-4 flex justify-center" role="dialog" aria-modal="true" aria-label={`${selected.name} preview`} onClick={() => setPreviewId(null)}>
-      <div className="w-full max-w-4xl" onClick={e => e.stopPropagation()}><div className="bg-white dark:bg-slate-800 rounded-t-xl p-4 flex justify-between items-center gap-4 sticky top-0 z-10"><h2 className="font-semibold">{selected.name} · Sample content</h2><div className="flex gap-2"><button className="btn-primary btn-sm" disabled={creating !== null} onClick={() => void selectTemplate(selected.id)}>Use template</button><button className="btn-secondary btn-sm" onClick={() => setPreviewId(null)}>Close</button></div></div><div className="bg-slate-200 p-4 overflow-x-auto"><selected.component resume={{ ...example, templateId: selected.id, accentColor: selected.accentColor }} /></div></div>
+      <div className="w-full max-w-4xl" onClick={e => e.stopPropagation()}><div className="bg-white dark:bg-slate-800 rounded-t-xl p-4 flex justify-between items-center gap-4 sticky top-0 z-10"><h2 className="font-semibold">{selected.name} · Sample content</h2><div className="flex gap-2"><button className="btn-primary btn-sm" disabled={creating !== null} onClick={() => void selectTemplate(selected.id)}>Use template</button><button className="btn-secondary btn-sm" onClick={() => setPreviewId(null)}>Close</button></div></div><div className="bg-slate-200 p-4 overflow-x-auto"><selected.component resume={{ ...(selected.id === 'editorial-profile' ? editorialExample : example), templateId: selected.id, accentColor: selected.accentColor }} /></div></div>
     </div>}
   </PublicLayout>;
 }

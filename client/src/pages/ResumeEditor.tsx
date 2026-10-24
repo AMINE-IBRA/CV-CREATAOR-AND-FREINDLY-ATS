@@ -92,7 +92,7 @@ function ExistingResumeEditor(){
       if(JSON.stringify(resumePayload(updated))!==JSON.stringify(resumePayload(snapshot)))update(updated);
       setChatMessages([...nextMessages,{role:'assistant' as const,content:result.reply}].slice(-12));
     }catch(err){
-      if(documentIdentity.current===identity){setChatMessages([...nextMessages,{role:'assistant' as const,content:'I could not apply that change. Your resume was left as it was. Please try again.'}].slice(-12));toast.error('AI edit failed',err instanceof Error?err.message:'Try again');}
+      if(documentIdentity.current===identity){const reason=err instanceof Error?err.message:'Please try again.';setChatMessages([...nextMessages,{role:'assistant' as const,content:'I couldn’t apply that CV change. '+reason}].slice(-12));toast.error('AI edit failed',reason);}
     }finally{if(documentIdentity.current===identity)setChatBusy(false);}
   }
   async function summaryAI(){
